@@ -63,4 +63,4 @@ Pixel art is its own art speciality, so I've been sketching some ideas.
 The main character will roll into a ball when jumping and "sprinting".
 I want the first boss to be a dragon, like the logo of langjamgamejam:
 
-![Langjam Gamejam logo: black and white pixel art of a fierce dragon with an outstretched claw and a mouth ready to breathe fire down on the peons.](./langjamgamejam.png)
+![Langjam Gamejam logo: black and white pixel art of a fierce dragon with an outstretched claw and a mouth ready to breathe fire down on the peons.](./img/langjamgamejam.png)
