@@ -64,3 +64,20 @@ The main character will roll into a ball when jumping and "sprinting".
 I want the first boss to be a dragon, like the logo of langjamgamejam:
 
 ![Langjam Gamejam logo: black and white pixel art of a fierce dragon with an outstretched claw and a mouth ready to breathe fire down on the peons.](./img/langjamgamejam.png)
+
+# Prep day 3 and 4: Evaluation
+
+evaluation is now possible
+let-in in a do-statement is a syntax error, in keyword not needed SMH
+haskell-language-server doesn't work well with stack, plus stack wasn't working well on Nix, might switch to Cabal
+package managers are hard!
+Felt language inspiring! LSP might be in my lang's future
+how to translate scheme to Javascript? variable name conversion...
+TODO letrec fun to implement, can help you write compiler or parser-combinator library
+
+Kaboom platform tutorial, no for-loops; JS code looks quite scheme-y already!
+will need to have dicts, maybe like clojure's? maybe JSON-like?
+TODO translate to Kaplay
+
+TODO double and complex numbers
+TODO dicts
