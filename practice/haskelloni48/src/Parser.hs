@@ -41,12 +41,16 @@ lexer = Tok.makeTokenParser $ Lang.emptyDef {
 
 whitespace :: Parser ()
 whitespace = Tok.whiteSpace lexer
+
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
+
 lexeme :: Parser a -> Parser a
 lexeme = Tok.lexeme lexer
+
 quoted :: Parser a -> Parser a
 quoted p = try (char '\'') *> p
+
 identifier :: Parser T.Text
 identifier = T.pack <$> (Tok.identifier lexer <|> specialIdentifier) <?> "identifier"
     where specialIdentifier = lexeme $ try $
@@ -87,7 +91,7 @@ hashVal = lexeme $ char '#'
     <|> char 'd' *> (Number <$> intRadix (10, digit))
     <|> char 'x' *> (Number <$> intRadix (16, hexDigit))
     <|> oneOf "ei" *> fail "Unsupported: exactness"
-    <|> char '(' *> fail "Unsupported: vector"
+    <|> Vector <$> parens manyLispVal
     <|> char '\\' *> fail "Unsupported: char")
 
 lispVal :: Parser LispVal

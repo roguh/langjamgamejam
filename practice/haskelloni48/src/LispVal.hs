@@ -33,6 +33,7 @@ data LispVal
     | Fun T.Text IFunc  -- Function name and action
     | Lambda IFunc EnvCtx
     | List [LispVal]
+    | Vector [LispVal]
     deriving (Eq)
 
 data IFunc = IFunc { fn :: [LispVal] -> Eval LispVal }
@@ -45,12 +46,13 @@ instance Show LispVal where
 
 showVal :: LispVal -> T.Text
 showVal val = case val of
-    (Atom atom)     -> atom
-    (Bool False)    -> "#f"
-    (Bool True)     -> "#t"
-    Nil             -> "Nil"
-    (Number num)    -> T.pack $ show num
-    (String str)    -> T.concat ["\"", str, "\""]
-    (Fun name _)    -> T.concat ["(function <", name, ">)"]
-    (Lambda _ _)    -> "(lambda function)"
-    (List contents) -> T.concat ["(", T.unwords $ showVal <$> contents, ")"]
+    (Atom atom)       -> atom
+    (Bool False)      -> "#f"
+    (Bool True)       -> "#t"
+    Nil               -> "Nil"
+    (Number num)      -> T.pack $ show num
+    (String str)      -> T.concat ["\"", str, "\""]
+    (Fun name _)      -> T.concat ["(function <", name, ">)"]
+    (Lambda _ _)      -> "(lambda function)"
+    (List contents)   -> T.concat ["(", T.unwords $ showVal <$> contents, ")"]
+    (Vector contents) -> T.concat ["#(", T.unwords $ showVal <$> contents, ")"]
