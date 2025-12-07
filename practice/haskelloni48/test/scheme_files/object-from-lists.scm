@@ -1,0 +1,1 @@
+(console.log (Object.fromEntries '('(2 3) '(4 5))))
