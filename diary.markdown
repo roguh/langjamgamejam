@@ -67,17 +67,42 @@ I want the first boss to be a dragon, like the logo of langjamgamejam:
 
 # Prep day 3 and 4: Evaluation
 
-evaluation is now possible
-let-in in a do-statement is a syntax error, in keyword not needed SMH
-haskell-language-server doesn't work well with stack, plus stack wasn't working well on Nix, might switch to Cabal
-package managers are hard!
-Felt language inspiring! LSP might be in my lang's future
-how to translate scheme to Javascript? variable name conversion...
-TODO letrec fun to implement, can help you write compiler or parser-combinator library
+This is day 3 and 4 of preparing for Langjam Gamejam, a fun new competition where participants will build a programming language and a videogame using that language.
 
-Kaboom platform tutorial, no for-loops; JS code looks quite scheme-y already!
-will need to have dicts, maybe like clojure's? maybe JSON-like?
-TODO translate to Kaplay
 
-TODO double and complex numbers
-TODO dicts
+My goal is to write a Haskell compiler for a Scheme-like language (Lisp) targeting JavaScript. I'm not sure what the videogame will be, but because I am generating JavaScript code, I have access to easy-to-use game libraries like Kaplay. The Kaplay game library is highly declarative, so it will likely make more sense in a functional language like Scheme.
+
+
+Evaluation and compilation are now possible.
+
+
+For example, I can go from this Scheme-like code:
+
+
+(console.log '((Math.cos 0) 2 3 "4"))
+
+
+To:
+
+
+console.log([Math.cos(0), 2, 3, "4"])
+
+
+I implemented several Scheme features such as let-bindings and lambda functions. First, I followed the tutorial Write Yourself A Scheme V2 written by Adam Wespiser and many open source contributors. After I felt confident with a basic Lisp interpreter, the real work began.
+
+
+I changed the Haskell code so it could generate JavaScript code instead of immediately interpreting the Scheme code. Then I ran the JavaScript through NodeJS to run it locally. There's some special considerations you need to take when converting Scheme into JavaScript, for example how would you convert a Scheme variable like "list-empty?" into a JavaScript name? It has a dash and a question mark, so we can't just use a JavaScript variable with the same name directly.
+
+
+The Haskell code is a mess. There is much refactoring and research in my future :) Haskell's powerful type system lets me refactor the code easily to try out several solutions without breaking existing features. I'm also implementing a thorough test suite, including larger Scheme programs like an FFT function. I hate having to fix old bugs or creating new bugs when building new features.
+
+
+Scheme's letrec was interesting to implement. I referred to Scheme's specification (R5RS) and it described how to implement it: define all variables and set them to `undefined` and then run each declaration's initializer in any order and assign them to the variables. This syntax allows you to refer to any variable in the letrec's scope recursively. This is useful for defining a parser or other recursive functions. For example, recursive descent parsers and parser combinators are often written using mutually recursive functions.
+
+
+I also rewrote a short Kaplay demo from Javascript into Scheme.
+
+Kaplay avoids for-loops and other imperative control structures, so it is quite easy to translate it into a functional programming language like Scheme.
+
+
+
