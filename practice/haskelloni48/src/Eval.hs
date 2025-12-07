@@ -18,7 +18,8 @@ import Util
 
 eval :: LispVal -> Eval LispVal
 eval (List [Atom "quote", val]) = return val
-eval (Number i) = return $ Number i
+eval (Number i b) = return $ Number i b
+eval (Double d) = return $ Double d
 eval (String s) = return $ String s
 eval (Bool b) = return $ Bool b
 eval (List []) = return Nil

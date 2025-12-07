@@ -61,10 +61,13 @@ type Radix = (Integer, Parser Char)
 
 numberWithRadix :: Radix -> Parser Integer
 numberWithRadix (base, baseDigit) = do
+    -- A decimal possibly followed by an n
     digits <- many1 baseDigit
     let n = foldl' (\x d -> base * x + toInteger (digitToInt d)) 0 digits
     seq n (return n)
 
+double :: Parser Double
+double = Tok.float lexer
 decimal :: Parser Integer
 decimal = Tok.decimal lexer
 
@@ -86,18 +89,23 @@ hashVal :: Parser LispVal
 hashVal = lexeme $ char '#'
     *> (char 't' $> Bool True
     <|> char 'f' $> Bool False
-    <|> char 'b' *> (Number <$> intRadix (2, oneOf "01"))
-    <|> char 'o' *> (Number <$> intRadix (8, octDigit))
-    <|> char 'd' *> (Number <$> intRadix (10, digit))
-    <|> char 'x' *> (Number <$> intRadix (16, hexDigit))
+    <|> char 'b' *> (Number <$> intRadix (2, oneOf "01") <*> isBigInt)
+    <|> char 'o' *> (Number <$> intRadix (8, octDigit) <*> isBigInt)
+    <|> char 'd' *> (Number <$> intRadix (10, digit) <*> isBigInt)
+    <|> char 'x' *> (Number <$> intRadix (16, hexDigit) <*> isBigInt)
     <|> oneOf "ei" *> fail "Unsupported: exactness"
     <|> Vector <$> parens manyLispVal
     <|> char '\\' *> fail "Unsupported: char")
 
+isBigInt :: Parser Bool
+isBigInt = try (char 'n') *> return True <|> return False
+
 lispVal :: Parser LispVal
 lispVal = hashVal
     <|> Nil <$ nil
-    <|> Number <$> try (sign <*> decimal)
+    -- The tty is essential to avoid eating input the decimal parser needs
+    <|> Double <$> try double
+    <|> Number <$> try (sign <*> decimal) <*> isBigInt
     <|> Atom  <$> identifier
     <|> String <$> textLiteral
     <|> _Quote <$> quoted lispVal

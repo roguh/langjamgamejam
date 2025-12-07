@@ -28,6 +28,7 @@ newtype CompileCtx a = CompileCtx {unCtx :: Reader Ctx a}
       MonadReader Ctx
     )
 
+initCtx :: Ctx
 initCtx = Ctx {vars = Map.map (const ()) stdlib, depth = 0}
 
 stdlib :: Map.Map T.Text T.Text
@@ -75,7 +76,8 @@ convert (Atom name) = do
 convert (Bool False) = return "false"
 convert (Bool True) = return "true"
 convert Nil = return "null"
-convert (Number num) = return . T.pack $ show num
+convert (Number num isBigInt) = return $ T.concat [T.pack $ show num, if isBigInt || num > maxF64Int then "n" else ""]
+convert (Double num) = return $ T.pack $ show num
 convert (String str) = return $ T.concat ["\"", str, "\""]
 convert (List [Atom "quote", (List contents)]) = do
   each <- mapM convert contents
@@ -136,9 +138,11 @@ convert (List (func@(Atom _) : args)) = do
     ]
 convert e = error ("javascript does not support " ++ show e)
 
+ensureVar :: LispVal -> T.Text
 ensureVar (Atom v) = v
 ensureVar n = error $ "type mismatch for variable " ++ show n
 
+lead :: Int -> T.Text -> T.Text
 lead n = mappend $ T.replicate (2 * n) " "
 
 deeper :: LispVal -> CompileCtx T.Text
@@ -149,3 +153,6 @@ deeper v = do
 
 joinT :: T.Text -> [T.Text] -> T.Text
 joinT = T.intercalate
+
+maxF64Int :: Integer
+maxF64Int = 562949953421311

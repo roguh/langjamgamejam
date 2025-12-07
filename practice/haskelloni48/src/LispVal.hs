@@ -32,7 +32,8 @@ data LispVal
   = Atom T.Text
   | Bool Bool
   | Nil
-  | Number Integer
+  | Number Integer Bool
+  | Double Double
   | String T.Text
   | Fun T.Text IFunc -- Function name and action
   | Lambda IFunc EnvCtx
@@ -54,7 +55,8 @@ showVal val = case val of
   (Bool False) -> "#f"
   (Bool True) -> "#t"
   Nil -> "Nil"
-  (Number num) -> T.pack $ show num
+  (Number num isBigInt) -> T.concat [T.pack $ show num, if isBigInt then "n" else ""]
+  (Double dbl) -> T.pack $ show dbl
   (String str) -> T.concat ["\"", str, "\""]
   (Fun name _) -> T.concat ["(function <", name, ">)"]
   (Lambda _ _) -> "(lambda function)"
