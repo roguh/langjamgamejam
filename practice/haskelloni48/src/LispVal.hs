@@ -39,6 +39,7 @@ data LispVal
   | Lambda IFunc EnvCtx
   | List [LispVal]
   | Vector [LispVal]
+  | Dict [LispVal]
   deriving (Eq)
 
 data IFunc = IFunc {fn :: [LispVal] -> Eval LispVal}
@@ -60,5 +61,6 @@ showVal val = case val of
   (String str) -> T.concat ["\"", str, "\""]
   (Fun name _) -> T.concat ["(function <", name, ">)"]
   (Lambda _ _) -> "(lambda function)"
+  (Dict contents) -> T.concat ["{", T.unwords $ showVal <$> contents, "}"]
   (List contents) -> T.concat ["(", T.unwords $ showVal <$> contents, ")"]
   (Vector contents) -> T.concat ["#(", T.unwords $ showVal <$> contents, ")"]

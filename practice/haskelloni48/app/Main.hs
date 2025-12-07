@@ -1,13 +1,14 @@
 module Main (main) where
 
 import qualified Data.Text as T
-import Eval
-import LispVal
+-- r.i.p. import Eval
 import Parser
 import Compile
 import System.Environment
 import System.IO
 
+-- Print to stderr fp 2
+debug :: String -> IO ()
 debug s = hPutStr stderr (s ++ "\n")
 
 main :: IO ()

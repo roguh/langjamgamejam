@@ -82,6 +82,10 @@ convert (String str) = return $ T.concat ["\"", str, "\""]
 convert (List [Atom "quote", (List contents)]) = do
   each <- mapM convert contents
   return $ T.concat ["[", joinT ", " each, "]"]
+convert (Dict keyvals) = do
+    let pairs = zip (evens keyvals) (odds keyvals)
+    each <- mapM (\(k, v) -> convert k >>= \k' -> convert v >>= \v' -> return $ T.concat [k', ": ", v']) pairs
+    return $ T.concat ["{", joinT ", " each, "}"]
 convert (List [Atom "quote", contents]) = convert contents
 convert (Vector contents) = do
   each <- mapM convert contents

@@ -35,7 +35,7 @@ lexer = Tok.makeTokenParser $ Lang.emptyDef {
     , Tok.commentLine = "--"
     , Tok.opStart = mzero
     , Tok.opLetter = mzero
-    , Tok.identStart = letter <|> oneOf "!$%&*/:<=>?^_~"
+    , Tok.identStart = letter <|> oneOf "!$%&*/:<=>?^_~,"
     , Tok.identLetter = digit <|> letter <|> oneOf "!$%&*/:<=>?^_~+-.@"
 }
 
@@ -44,6 +44,9 @@ whitespace = Tok.whiteSpace lexer
 
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
+
+braces :: Parser a -> Parser a
+braces = Tok.braces lexer
 
 lexeme :: Parser a -> Parser a
 lexeme = Tok.lexeme lexer
@@ -102,6 +105,7 @@ isBigInt = try (char 'n') *> return True <|> return False
 
 lispVal :: Parser LispVal
 lispVal = hashVal
+    <|> Dict <$> braces dictItems
     <|> Nil <$ nil
     -- The tty is essential to avoid eating input the decimal parser needs
     <|> Double <$> try double
@@ -113,6 +117,18 @@ lispVal = hashVal
 
 manyLispVal :: Parser [LispVal]
 manyLispVal = lispVal `sepBy` whitespace
+
+notColon :: LispVal -> Bool
+notColon (Atom ":") = False
+notColon (Atom ",") = False
+notColon _ = True
+
+stripColon :: LispVal -> LispVal
+stripColon (Atom s) = Atom . maybe s id $ T.stripSuffix ":" s
+stripColon v = v
+
+dictItems :: Parser [LispVal]
+dictItems = map stripColon <$> filter notColon <$> lispVal `sepBy` whitespace 
 
 _Quote :: LispVal -> LispVal
 _Quote x = List [Atom "quote", x]
