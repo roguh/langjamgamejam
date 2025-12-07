@@ -28,37 +28,68 @@ newtype CompileCtx a = CompileCtx {unCtx :: Reader Ctx a}
       MonadReader Ctx
     )
 
-initCtx = Ctx {vars = Map.fromList [("car", ()), ("cdr", ())], depth = 0}
+initCtx = Ctx {vars = Map.map (const ()) stdlib, depth = 0}
+
+stdlib :: Map.Map T.Text T.Text
+stdlib =
+  Map.fromList
+    [ ("car", "(l) => l ? l[0] : []"),
+      ("cdr", "(l) => l.slice(1)"),
+      -- TODO foldable?
+      ("*", "(a, b) => a * b"),
+      ("+", "(a, b) => a + b"),
+      ("-", "(a, b) => b === undefined ? -a : a - b"),
+      ("/", "(a, b) => a / b"),
+      ("%", "(a, b) => a % b"),
+      ("^", "(a, b) => a ** b"),
+      ("&", "(a, b) => a & b"),
+      ("|", "(a, b) => a | b"),
+      ("<<", "(a, b) => a << b"),
+      (">>", "(a, b) => a >> b"),
+      ("~", "(a) => ~a"),
+      ("==", "(a, b) => a === b"),
+      ("!=", "(a, b) => a !== b"),
+      ("<", "(a, b) => a < b"),
+      (">", "(a, b) => a > b"),
+      ("<=", "(a, b) => a <= b"),
+      (">=", "(a, b) => a >= b"),
+      ("&&", "(a, b) => a && b"),
+      ("||", "(a, b) => a || b"),
+      ("!", "(a) => !a")
+    ]
 
 toJS :: LispVal -> T.Text
 toJS v =
-  let body = runReader (unCtx $ toJS_ v) initCtx
-   in joinT "\n" ["const __scope__ = {\"car\": (l) => l ? l[0] : [], \"cdr\": (l) => l.slice(1)};", body]
+  let body = runReader (unCtx $ convert v) initCtx
+   in joinT "" $
+        ["const __scope__ = {"]
+          ++ (map (\(var, val) -> T.concat ["\"", var, "\": ", val, ","]) (Map.toList stdlib))
+          ++ ["};\n\n", body]
 
-toJS_ :: LispVal -> CompileCtx T.Text
-toJS_ (Atom name) = do
+convert :: LispVal -> CompileCtx T.Text
+convert (Atom name) = do
   env <- ask
   case Map.lookup name (vars env) of
     Just () -> return $ T.concat ["__scope__[\"", name, "\"]"]
     Nothing -> return name -- Assume it's a global
-toJS_ (Bool False) = return "false"
-toJS_ (Bool True) = return "true"
-toJS_ Nil = return "null"
-toJS_ (Number num) = return . T.pack $ show num
-toJS_ (String str) = return $ T.concat ["\"", str, "\""]
-toJS_ (List [Atom "quote", (List contents)]) = do
-  each <- mapM toJS_ contents
+convert (Bool False) = return "false"
+convert (Bool True) = return "true"
+convert Nil = return "null"
+convert (Number num) = return . T.pack $ show num
+convert (String str) = return $ T.concat ["\"", str, "\""]
+convert (List [Atom "quote", (List contents)]) = do
+  each <- mapM convert contents
   return $ T.concat ["[", joinT ", " each, "]"]
-toJS_ (List [Atom "quote", contents]) = toJS_ contents
-toJS_ (Vector contents) = do
-  each <- mapM toJS_ contents
+convert (List [Atom "quote", contents]) = convert contents
+convert (Vector contents) = do
+  each <- mapM convert contents
   return $ T.concat ["[", joinT ", " each, "]"]
-toJS_ (List [Atom "if", predicate, tExpr, fExpr]) = do
+convert (List [Atom "if", predicate, tExpr, fExpr]) = do
   p <- deeper predicate
   t <- deeper tExpr
   f <- deeper fExpr
   return $ joinT "\n" ["(", p, ") ? (", t, ") : (", f, ")"]
-toJS_ (List [Atom "let", List pairs, expr]) = do
+convert (List [Atom "let", List pairs, expr]) = do
   env <- ask
   let varNames = evens pairs
   let exprs = odds pairs
@@ -67,7 +98,7 @@ toJS_ (List [Atom "let", List pairs, expr]) = do
       ( \(a, b) ->
           ( deeper b
               >>= ( \r ->
-                      return . lead (depth env) $
+                      return . lead (1 + (depth env)) $
                         T.concat
                           [ "__scope__[\"",
                             ensureVar a,
@@ -82,36 +113,38 @@ toJS_ (List [Atom "let", List pairs, expr]) = do
       (zip varNames exprs)
   -- Now evaluate the body and keep track of scheme-defined variables
   let vars' = Map.fromList (map (\a -> (ensureVar a, ())) varNames) <> (vars env)
-  e <- local (const $ env {vars = vars'}) $ deeper expr
+  exprT <- local (const $ env {vars = vars'}) $ deeper expr
   return $
     joinT "\n" $
-      ["((__scope__) => ("]
+      [lead (depth env) "((__scope__) => ("]
         ++ bindings
-        ++ [ e,
-             ")",
-             ")({...__scope__})" -- clone the parent scope to form a new scope
+        ++ [ lead (depth env) exprT,
+             lead (depth env) "))({...__scope__})" -- clone the parent scope to form a new scope
            ]
-toJS_ (List (func@(Atom _) : args)) = do
-  funcT <- toJS_ func
-  argsT <- mapM toJS_ args
+convert (List [Atom "lambda", (List args), body]) = do
+  let argsT = map ensureVar args
+  bodyT <- deeper body
+  return $ T.concat ["(", joinT ", " argsT, ") => (", bodyT, ")"]
+convert (List (func@(Atom _) : args)) = do
+  funcT <- convert func
+  argsT <- mapM convert args
   return . T.concat $
     [ funcT, -- Function name
       "(",
       joinT ", " argsT, -- Arguments
       ")"
     ]
-
--- toJS lvl e = error ("javascript does not support " ++ show e)
+convert e = error ("javascript does not support " ++ show e)
 
 ensureVar (Atom v) = v
 ensureVar n = error $ "type mismatch for variable " ++ show n
 
-lead n = mappend $ T.replicate n " "
+lead n = mappend $ T.replicate (2 * n) " "
 
 deeper :: LispVal -> CompileCtx T.Text
 deeper v = do
   env <- ask
-  result <- local (const $ env {depth = (depth env) + 1}) $ toJS_ v
+  result <- local (const $ env {depth = (depth env) + 1}) $ convert v
   return $ lead (depth env) result
 
 joinT :: T.Text -> [T.Text] -> T.Text
