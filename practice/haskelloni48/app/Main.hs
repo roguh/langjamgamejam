@@ -4,7 +4,11 @@ import qualified Data.Text as T
 import Eval
 import LispVal
 import Parser
+import Compile
 import System.Environment
+import System.IO
+
+debug s = hPutStr stderr (s ++ "\n")
 
 main :: IO ()
 main = do
@@ -14,6 +18,10 @@ main = do
   case Parser.readExpr (T.pack expr) of
     Left err -> putStrLn (show err)
     Right val -> do
-      putStrLn $ show val
-      result <- run $ eval val
-      putStrLn $ show result
+      debug "Parsing"
+      debug expr
+      debug "Compiling Scheme to JavaScript (?!?!?)"
+      debug $ show val
+      -- result <- run $ eval val
+      -- putStrLn $ show result
+      putStrLn . T.unpack $ toJS val

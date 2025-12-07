@@ -25,9 +25,11 @@ source-repository head
 
 library
   exposed-modules:
+      Compile
       Eval
       LispVal
       Parser
+      Util
   other-modules:
       Paths_haskelloni48
   autogen-modules:

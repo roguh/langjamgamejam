@@ -14,6 +14,7 @@ import Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import LispVal
+import Util
 
 eval :: LispVal -> Eval LispVal
 eval (List [Atom "quote", val]) = return val
@@ -63,14 +64,6 @@ eval (List [Atom "letrec", List pairs, expr]) = do
   -- the body is evaluated in the resulting environment,
   -- and the value(s) of the last expression in body is(are) returned.
   local (const envFinal) $ eval expr
-
-evens :: [t] -> [t]
-evens [] = []
-evens (x : xs) = x : odds xs
-
-odds :: [t] -> [t]
-odds [] = []
-odds (_ : xs) = evens xs
 
 ensureAtom :: LispVal -> Eval LispVal
 ensureAtom n@(Atom _) = return n
