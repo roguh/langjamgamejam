@@ -2,11 +2,14 @@
 
 module Eval
   ( eval,
+    run,
   )
 where
 
+import Control.Monad (foldM)
 import Control.Monad.Reader
   ( MonadReader (ask, local),
+    runReaderT,
   )
 import qualified Data.Map as Map
 import qualified Data.Text as T
@@ -35,16 +38,39 @@ eval (List [Atom "if", predicate, tExpr, fExpr]) = do
 eval (List [Atom "let", List pairs, expr]) = do
   env <- ask
   atoms <- mapM ensureAtom $ evens pairs
-  vals <- mapM eval . evens $ tail pairs
+  vals <- mapM eval $ odds pairs
   let env' = Map.fromList (Prelude.zipWith (\a b -> (extractVar a, b)) atoms vals) <> env
   local (const env') $ eval expr
+eval (List [Atom "letrec", List pairs, expr]) = do
+  env <- ask
+  atoms <- mapM ensureAtom $ evens pairs
+  vals <- mapM eval $ odds pairs
+  -- The variables are bound to fresh locations holding undefined values,
+  let envNils = Map.fromList (map (\a -> (extractVar a, Nil)) atoms) <> env
 
--- TODO letrec and let* yayyy
+  -- the inits are evaluated in the resulting environment (in some unspecified order),
+  -- each variable is assigned to the result of the corresponding init,
+  envFinal <-
+    ( foldM
+        ( \envLocal (a, b) -> do
+            result <- eval b
+            return $ Map.insert (extractVar a) result envLocal
+        )
+        envNils
+        (zip atoms vals)
+      )
+
+  -- the body is evaluated in the resulting environment,
+  -- and the value(s) of the last expression in body is(are) returned.
+  local (const envFinal) $ eval expr
 
 evens :: [t] -> [t]
 evens [] = []
-evens (x : _ : xs) = x : evens xs
-evens (_ : []) = []
+evens (x : xs) = x : odds xs
+
+odds :: [t] -> [t]
+odds [] = []
+odds (_ : xs) = evens xs
 
 ensureAtom :: LispVal -> Eval LispVal
 ensureAtom n@(Atom _) = return n
@@ -60,3 +86,13 @@ getVar (Atom atom) = do
     Just x -> return x
     Nothing -> error ("undefined variable " ++ (T.unpack atom))
 getVar n = error ("wrong type for a variable " ++ (show n))
+
+basicEnv :: Map.Map T.Text LispVal
+basicEnv =
+  Map.fromList []
+
+runASTinEnv :: EnvCtx -> Eval b -> IO b
+runASTinEnv code action = runReaderT (unEval action) code
+
+run :: Eval b -> IO b
+run action = runASTinEnv basicEnv action
