@@ -1,4 +1,5 @@
 * test programs
+- TODO find a good reference Scheme interpreter
 
 * nice-to-have features for the new language:
 - LSP: language server protocol for autocompletions and syntax
@@ -8,3 +9,53 @@
 * developer experience
 - haskell-language-server: autocompletions for ur editor
 - code format with ormolu
+
+* syntax based on R5Rs
+- identifiers are case insensitive
+- character escape code
+- semicolon comment ;
+- block comment #| |#
+- R5Rs 2.3 justifies my wacky dictionary syntax!
+    "[ ] { } | Left and right square brackets and curly braces
+    and vertical bar are reserved for possible future exten-
+    sions to the language."
+- R7Rs-small might be cool!
+    - unicode identifiers
+
+* features
+** very nice to have for the hackathon:
+- allow read/code-as-data
+    - store lisp representation within each object?
+    - (read '(a b (+ 2 3))) -> "LispCode('(a b (+ 2 3))')"
+- closures
+    - should be straightforward because javascript supports closures
+- continuations (how t.f. to implement in javascript?)
+- macros (at least simple ones)
+    - idea for game: inline level-definition via macro
+- backquote, comma, comma-ampersand
+    - reminds me of string interpolation?
+
+** easy?
+- define, set!
+    - (define (variable . formal) body)
+- begin sequencing, top-level is a giant (begin)
+- delay/force for lazy programming
+- proper atoms
+- do
+- for-each
+- extended dictionary support, more lisp-like (make-dict) (union)
+- repl
+    - rlwrap, node wrapper
+
+** less easy
+- a complete number pyramid including rationals and complex numbers in javascript
+    - javascript how omg
+- cond: compile efficiently if possible
+- proper lists, an linked list with car and cdr fields
+    - allows for IMPROPER lists
+    - implement the dot operator (h . t)
+- eval
+    - scheme in JS
+    - limited support?
+- good error messages?
+    - at least show the location of the error nicely
