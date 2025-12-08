@@ -37,6 +37,7 @@ lexer = Tok.makeTokenParser $ Lang.emptyDef {
     , Tok.opLetter = mzero
     , Tok.identStart = letter <|> oneOf "!$%&*/:<=>?^_~,"
     , Tok.identLetter = digit <|> letter <|> oneOf "!$%&*/:<=>?^_~+-.@"
+    , Tok.reservedNames = ["__scope__"]
 }
 
 whitespace :: Parser ()
