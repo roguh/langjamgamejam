@@ -106,3 +106,21 @@ Kaplay avoids for-loops and other imperative control structures, so it is quite 
 
 
 
+
+# Prep day 5: More evaluation and JS vs. Scheme
+
+This is day 5 of preparing for Langjam Gamejam, a fun new competition where participants will build a programming language and a videogame using their new language.
+
+My goal is to write a Haskell compiler for a Scheme-like language (Lisp) targeting JavaScript.
+
+double and explicit/implicit bigint
+dicts
+bigint, fft in scheme
+tons of new stdlib required, list construction and iteration, no for-loops! heavily using JS immutable features like array cloning
+should i use scheme or js or both? scheme is wordier but js is harder
+clojure inspiration
+
+dreams: LSP, good repl with autocomplete, python-style docstrings, numpy/pandas inspiration for easy numeric programming, formatter, AI-friendly AGENTS.md for working with this lang
+live FFT of mic data; make this JUST AS FAST as good javascript
+
+what videogame will we write with this lang? stick around to find out!
