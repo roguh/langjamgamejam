@@ -34,8 +34,17 @@ initCtx = Ctx {vars = Map.map (const ()) stdlib, depth = 0}
 stdlib :: Map.Map T.Text T.Text
 stdlib =
   Map.fromList
-    [ ("car", "(l) => l ? l[0] : []"),
+    [ ("car", "(l) => l ? l[0] : null"),
+      ("cadr", "(l) => l.length > 1 ? l[1] : null"),
       ("cdr", "(l) => l.slice(1)"),
+      -- Return a copy of the list, no mutation!
+      ("cons", "(e, l) => [e, ...(l || [])]"),
+      ("snoc", "(l, e) => [...(l || []), e]"),
+      ("map", "(a, f) => a.map(f)"),
+      ("new", "(t, ...args) => new t(args)"),
+      ("get", "(o, v) => o[v]"),
+      ("make-vector", "(len, fill) => new Array(len).fill(fill)"),
+      ("fold", "(fun, acc, arr) => arr.reduce(fun, acc)"),
       -- TODO foldable?
       ("*", "(a, b) => a * b"),
       ("+", "(a, b) => a + b"),
@@ -43,12 +52,17 @@ stdlib =
       ("/", "(a, b) => a / b"),
       ("%", "(a, b) => a % b"),
       ("^", "(a, b) => a ** b"),
+      ("**", "(a, b) => a ** b"),
       ("&", "(a, b) => a & b"),
       ("|", "(a, b) => a | b"),
+      ("bitwise-and", "(a, b) => a & b"),
+      ("bitwise-or", "(a, b) => a | b"),
+      ("bitwise-xor", "(a, b) => a ^ b"),
       ("<<", "(a, b) => a << b"),
       (">>", "(a, b) => a >> b"),
       ("~", "(a) => ~a"),
       ("==", "(a, b) => a === b"),
+      ("===", "(a, b) => a === b"),
       ("!=", "(a, b) => a !== b"),
       ("<", "(a, b) => a < b"),
       (">", "(a, b) => a > b"),
