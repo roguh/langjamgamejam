@@ -109,6 +109,37 @@ convert (List [Atom "if", predicate, tExpr, fExpr]) = do
   t <- deeper tExpr
   f <- deeper fExpr
   return $ joinT "\n" ["(", p, ") ? (", t, ") : (", f, ")"]
+convert (List [Atom "letrec", List pairs, expr]) = do
+  env <- ask
+  let varNames = evens pairs
+  let exprs = odds pairs
+  let varsWithNil = Map.fromList (map (\a -> (ensureVar a, ())) varNames) <> (vars env)
+  bindings <-
+    mapM
+      ( \(a, b) ->
+          ( (local (const $ env { vars = varsWithNil }) $ deeper b)
+              >>= ( \r ->
+                      return . lead (1 + (depth env)) $
+                        T.concat
+                          [ "__scope__[\"",
+                            ensureVar a,
+                            "\"]", -- Variable name
+                            " = (",
+                            r, -- Variable value
+                            "),"
+                          ]
+                  )
+          )
+      )
+      (zip varNames exprs)
+  exprT <- local (const $ env { vars = varsWithNil }) $ deeper expr
+  return $
+    joinT "\n" $
+      [lead (depth env) "((__scope__) => ("]
+        ++ bindings
+        ++ [ lead (depth env) exprT,
+             lead (depth env) "))({...__scope__})" -- clone the parent scope to form a new scope
+           ]
 convert (List [Atom "let", List pairs, expr]) = do
   env <- ask
   let varNames = evens pairs
