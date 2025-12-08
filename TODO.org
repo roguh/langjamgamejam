@@ -1,0 +1,10 @@
+* test programs
+
+* nice-to-have features for the new language:
+- LSP: language server protocol for autocompletions and syntax
+- sourcemap for nice error messages that link JS source code to original Scheme source code
+- external JS minification and optimization tool
+
+* developer experience
+- haskell-language-server: autocompletions for ur editor
+- code format with ormolu
