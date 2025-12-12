@@ -1,6 +1,6 @@
-import gleam
 import gleam/float
 import gleam/int
+import gleam/io
 import gleam/list
 import gleam/option
 import gleam/result
@@ -12,8 +12,8 @@ import atto/text.{match}
 import atto/text_util.{ws}
 
 import tree.{
-  type CompilationArtifact, Block, Dict, ExprStmt, Float, If, Int, Lambda, List,
-  Name, ParenList, Program_, String, While,
+  type CompilationArtifact, AnnieProgram, Block, Dict, ExprStmt, Float, If, Int,
+  Lambda, List, Name, ParenList, String, While,
 }
 
 fn stmt() {
@@ -60,9 +60,9 @@ fn while() {
 
 fn lambda() {
   use <- atto.label("lambda")
-  use <- drop(match("\\") |> ws())
+  use <- drop(token("\\") |> ws())
   use params <- do(ops.sep(name(), by: token(",") |> ws()))
-  use <- drop(match("->") |> ws())
+  use <- drop(match("\\\\->") |> ws())
   use body <- do(stmts())
   pure(Lambda(params, body))
 }
@@ -190,22 +190,20 @@ fn hex__() {
   }
 }
 
+fn prog() {
+  use x <- do(stmts())
+  use <- drop(atto.eof())
+  pure(AnnieProgram(x, Nil))
+}
+
 pub fn parse(input: String) -> CompilationArtifact {
   let src = text.new(input)
-  let result =
-    atto.run(
-      {
-        use x <- do(stmts())
-        use <- drop(atto.eof())
-        pure(Program_(x, gleam.Nil))
-      },
-      src,
-      gleam.Nil,
-    )
+  let parser_ = prog()
+  let result = atto.run(parser_, src, Nil)
   case result {
     Ok(e) -> Ok(e)
     Error(err) -> Error(error.pretty(err, src, False))
   }
 }
 
-pub const empty_program = Program_([], gleam.Nil)
+pub const empty_program = AnnieProgram([], Nil)
