@@ -1,6 +1,5 @@
 import gleam/float
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/option
 import gleam/result
@@ -62,7 +61,7 @@ fn lambda() {
   use <- atto.label("lambda")
   use <- drop(token("\\") |> ws())
   use params <- do(ops.sep(name(), by: token(",") |> ws()))
-  use <- drop(match("\\\\->") |> ws())
+  use <- drop(match("->") |> ws())
   use body <- do(stmts())
   pure(Lambda(params, body))
 }

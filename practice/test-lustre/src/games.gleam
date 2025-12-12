@@ -5,7 +5,7 @@ import gleam/option.{None, Some}
 const games = [
   #("@TicTacToe", "[[1,2,3],[4,5,6],[7,8,9]]"),
   #("@Chess", "[R, N, B, Q, K, B, N, R]"),
-  #("@Pong", "______\n\n\n______"),
+  #("@Pong", "______;\n\n\"  O  \";\n\n______"),
   #("@CardsForHumanity", "[card1, card2, judge]"),
 ]
 

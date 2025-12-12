@@ -13,7 +13,7 @@ import games
 import js/generate
 import parse
 import tree.{type AnnieProgram}
-import ui.{p, y}
+import ui.{i, p, y}
 
 const arena_id = "___annie_arena___"
 
@@ -24,6 +24,7 @@ type Model {
     iteration: Int,
     game_name: String,
     custom_name: String,
+    cat_is: String,
   )
 }
 
@@ -43,6 +44,7 @@ fn update(model: Model, event: Event) -> Model {
         // TODO concise record editing in erlang
         model.game_name,
         model.custom_name,
+        model.cat_is,
       )
     LoadGame(game_str) ->
       Model(
@@ -51,6 +53,7 @@ fn update(model: Model, event: Event) -> Model {
         model.iteration + 1 % 2_000_000_000,
         unwrap(games.name(game_str), model.custom_name),
         model.custom_name,
+        model.cat_is,
       )
     CustomizeName(new_name) ->
       Model(
@@ -59,6 +62,7 @@ fn update(model: Model, event: Event) -> Model {
         model.iteration,
         model.game_name,
         new_name,
+        model.cat_is,
       )
   }
 }
@@ -70,6 +74,10 @@ fn view(model: Model) -> Element(Event) {
     Ok(content) -> generate.generate(content, arena_id)
     Error(_error) -> ""
   }
+  let err = case model.compilation_artifact {
+    Ok(_) -> ""
+    Error(_error) -> "check your code for an error"
+  }
   // Use a keyed div to insert a new script element every time the user modifies the source code
   let script =
     keyed.div([], [
@@ -78,31 +86,48 @@ fn view(model: Model) -> Element(Event) {
         html.script([attribute.type_("text/javascript")], code),
       ),
     ])
+  let gen =
+    list.map(games.names(), fn(n: String) -> #(String, Element(Event)) {
+      #(
+        n,
+        html.button(
+          [
+            y("background-color", games.random_color()),
+            y("margin-right", "1em"),
+            event.on_click(LoadGame(n)),
+          ],
+          [
+            html.text(n),
+          ],
+        ),
+      )
+    })
   let game_buttons =
     keyed.ul(
-      [],
+      [y("margin", "0"), y("padding", "0")],
       // TODO game icons!
-      list.map(games.names(), fn(n: String) -> #(String, Element(Event)) {
+      [
         #(
-          n,
+          "from_file",
           html.button(
             [
-              y("background-color", games.random_color()),
+              y("background-color", "darkblue"),
               y("margin-right", "1em"),
-              event.on_click(LoadGame(n)),
+              event.on_click(LoadGame("\"custom!\"")),
             ],
             [
-              html.text(n),
+              html.text("Load from file"),
             ],
           ),
-        )
-      }),
+        ),
+        ..gen
+      ],
     )
   html.div(
     [
       y("display", "flex"),
       y("flex-direction", "column"),
-      y("padding", "4rem"),
+      y("padding", "1em 4em"),
     ],
     [
       html.link([
@@ -112,6 +137,7 @@ fn view(model: Model) -> Element(Event) {
       ]),
       game_buttons,
       html.h1([], [html.text(model.game_name)]),
+      i(err),
       html.div(
         [
           y("min-height", "80vh"),
@@ -119,6 +145,8 @@ fn view(model: Model) -> Element(Event) {
         ],
         [],
       ),
+      p("Hint: scroll down"),
+      html.div([y("height", "10vh")], []),
       html.h2([], [html.text("Hello, world! It's game making time :)")]),
       p(
         "It appears you've found a super fun code editor for the game shown above!",
@@ -134,15 +162,29 @@ fn view(model: Model) -> Element(Event) {
         ]),
         html.figcaption([y("font-y", "italic")], [
           html.text(
-            "A cat looks straight at the camera while it lies sideways on a comfy wooden floor."
-            <> " She is preparing to play a game.",
+            "A cat looks straight at the camera while it lies sideways on a comfy wooden floor. "
+            <> model.cat_is
+            <> " preparing to play a game.",
           ),
         ]),
       ]),
-      html.input([
-        attribute.type_("text"),
-        attribute.placeholder("Enter game source code"),
-        event.on_input(UserInput),
+      html.div([y("display", "flex"), y("flex-direction", "row")], [
+        html.input([
+          attribute.type_("text"),
+          attribute.placeholder("Enter game source code"),
+          attribute.value(model.source),
+          event.on_input(UserInput),
+        ]),
+        html.button(
+          [
+            y("background-color", "darkblue"),
+            y("margin-left", "1em"),
+            attribute.type_("button"),
+          ],
+          [
+            html.text("Download"),
+          ],
+        ),
       ]),
       compilation_view,
       script,
@@ -151,7 +193,19 @@ fn view(model: Model) -> Element(Event) {
 }
 
 fn init(_args) -> Model {
-  Model("", Ok(parse.empty_program), int.random(2_000_000_000), "", "")
+  let foxnews = ["She is", "He is", "They are"]
+  let cat_is = case list.sample(foxnews, 1) {
+    [n] -> n
+    _ -> "She is"
+  }
+  Model(
+    "",
+    Ok(parse.empty_program),
+    int.random(2_000_000_000),
+    "",
+    "(no name)",
+    cat_is,
+  )
 }
 
 pub fn main() {

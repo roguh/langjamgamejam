@@ -13,6 +13,10 @@ pub fn p(content: String) {
   html.p([], [html.text(content)])
 }
 
+pub fn i(content: String) {
+  html.p([y("font-style", "italic")], [html.text(content)])
+}
+
 pub fn code(content: String, color: String) {
   html.pre([], [
     html.code([y("color", color)], [
@@ -23,7 +27,11 @@ pub fn code(content: String, color: String) {
 
 pub fn view(compilation_artifact: CompilationArtifact) -> Element(a) {
   case compilation_artifact {
-    Ok(content) -> code(pretty.pretty(content), "white")
+    Ok(content) ->
+      html.div([], [
+        i("No compilation errors."),
+        code(pretty.pretty(content), "white"),
+      ])
     Error(error) -> code(error, "red")
   }
 }
