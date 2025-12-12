@@ -1,29 +1,44 @@
 import lustre
 import lustre/attribute
+import lustre/element.{type Element}
 import lustre/element/html
 import lustre/element/keyed
 import lustre/event
 
 import gleam/int
+import gleam/list
+import gleam/option.{unwrap}
+import gleam/string
 
+import games
+import js/generate
 import parse
+import syntax.{type Program, empty_program}
 
 const arena_id = "___annie_arena___"
 
 type Model {
   Model(
     source: String,
-    compilation_artifact: Result(String, String),
+    compilation_artifact: Result(Program, String),
     iteration: Int,
+    game_name: String,
+    custom_name: String,
   )
 }
 
 type Event {
   UserInput(String)
+  LoadGame(String)
+  CustomizeName(String)
 }
 
 fn y(key: String, value: String) {
   attribute.style(key, value)
+}
+
+fn p(content: String) {
+  html.p([], [html.text(content)])
 }
 
 fn code(content: String, color: String) {
@@ -39,20 +54,39 @@ fn update(model: Model, event: Event) -> Model {
     UserInput(source) ->
       Model(
         source,
-        parse.parse(source, arena_id),
+        parse.parse(source),
         model.iteration + 1 % 2_000_000_000,
+        // TODO concise record editing in erlang
+        model.game_name,
+        model.custom_name,
+      )
+    LoadGame(game_str) ->
+      Model(
+        games.load(game_str),
+        parse.parse(games.load(game_str)),
+        model.iteration + 1 % 2_000_000_000,
+        unwrap(games.name(game_str), model.custom_name),
+        model.custom_name,
+      )
+    CustomizeName(new_name) ->
+      Model(
+        model.source,
+        model.compilation_artifact,
+        model.iteration,
+        model.game_name,
+        new_name,
       )
   }
 }
 
-fn view(model: Model) {
+fn view(model: Model) -> Element(Event) {
   let css_link = "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
   let result = case model.compilation_artifact {
-    Ok(content) -> code(content, "white")
+    Ok(content) -> code(string.inspect(content), "white")
     Error(error) -> code(error, "red")
   }
   let code = case model.compilation_artifact {
-    Ok(content) -> content
+    Ok(content) -> generate.generate(content, arena_id)
     Error(_error) -> ""
   }
   // Use a keyed div to insert a new script element every time the user modifies the source code
@@ -63,6 +97,13 @@ fn view(model: Model) {
         html.script([attribute.type_("text/javascript")], code),
       ),
     ])
+  let game_buttons =
+    keyed.ul(
+      [],
+      list.map(games.names(), fn(n: String) -> #(String, Element(Event)) {
+        #(n, html.button([event.on_click(LoadGame(n))], [html.text(n)]))
+      }),
+    )
   html.div(
     [
       y("display", "flex"),
@@ -71,36 +112,39 @@ fn view(model: Model) {
     ],
     [
       html.link([
-        attribute.rel("ysheet"),
+        attribute.rel("stylesheet"),
         attribute.type_("text/css"),
         attribute.href(css_link),
       ]),
+      html.h1([], [html.text(model.game_name)]),
+      game_buttons,
       html.div(
         [
-          y("min-height", "90vh"),
+          y("min-height", "80vh"),
           attribute.id(arena_id),
         ],
         [],
       ),
-      html.h1([], [html.text("Hello, world! Time to game make :)")]),
-      html.figure(
-        [
-          y("justify-content", "center"),
-        ],
-        [
-          html.img([
-            y("height", "20vh"),
-            y("min-height", "200px"),
-            attribute.src("https://cdn2.thecatapi.com/images/b7k.jpg"),
-          ]),
-          html.figcaption([y("font-y", "italic")], [
-            html.text(
-              "A cat looks straight at the camera while it lies sideways on a comfy wooden floor."
-              <> " She is preparing to play a game.",
-            ),
-          ]),
-        ],
+      html.h2([], [html.text("Hello, world! It's game making time :)")]),
+      p(
+        "It appears you've found a super fun code editor for the game shown above!",
       ),
+      p(
+        "Why not try editing? It's harmless and you can learn from it or reload the page to reset.",
+      ),
+      html.figure([], [
+        html.img([
+          y("height", "20vh"),
+          y("min-height", "200px"),
+          attribute.src("https://cdn2.thecatapi.com/images/b7k.jpg"),
+        ]),
+        html.figcaption([y("font-y", "italic")], [
+          html.text(
+            "A cat looks straight at the camera while it lies sideways on a comfy wooden floor."
+            <> " She is preparing to play a game.",
+          ),
+        ]),
+      ]),
       html.input([
         attribute.type_("text"),
         attribute.placeholder("Enter game source code"),
@@ -113,7 +157,7 @@ fn view(model: Model) {
 }
 
 fn init(_args) -> Model {
-  Model("", Ok(""), int.random(2_000_000_000))
+  Model("", Ok(empty_program), int.random(2_000_000_000), "", "")
 }
 
 pub fn main() {

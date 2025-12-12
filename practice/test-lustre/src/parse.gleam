@@ -1,10 +1,9 @@
+import gleam
 import gleam/float
 import gleam/int
-import gleam/json
 import gleam/list
 import gleam/option
 import gleam/result
-import gleam/string
 
 import atto.{do, drop, fail_msg, map, pure, token}
 import atto/error
@@ -12,93 +11,17 @@ import atto/ops
 import atto/text.{match}
 import atto/text_util.{ws}
 
-// type P(v) =
-//  atto.Parser(v, String, String, a, b)
-//
-
-const max_safe_int = 9_007_199_254_740_991
-
-type Expr {
-  Name(List(String))
-  Int(Int, String)
-  Float(Float)
-  String(String)
-  List(List(Expr))
-  ParenList(List(Expr))
-  Dict(List(#(Expr, Expr)))
-  Nil
-}
-
-type Stmt {
-  ExprStmt(Expr)
-  Decl(List(String), Expr)
-  Assign(List(String), Expr)
-  Lambda(List(String), List(Stmt))
-  Block(List(Stmt))
-  If(Expr, List(Stmt), List(Stmt))
-  While(Expr, List(Stmt))
-}
-
-/// Convert an expression to JavaScript code.
-fn expr_to_js(expr: Expr) -> String {
-  case expr {
-    Float(f) -> "/* Float */ " <> float.to_string(f)
-    String(s) -> "\"" <> s <> "\""
-    Int(i, s) ->
-      case int.absolute_value(i) < max_safe_int {
-        True -> int.to_string(i)
-        False -> s <> "n"
-      }
-    Name(n) -> string.join(n, ".")
-    List(items) -> "[" <> string.join(list.map(items, expr_to_js), ", ") <> "]"
-    ParenList(items) ->
-      "(" <> string.join(list.map(items, expr_to_js), ", ") <> ")"
-    Dict(items) ->
-      "{"
-      <> string.join(
-        list.map(items, fn(kv) { expr_to_js(kv.0) <> ": " <> expr_to_js(kv.1) }),
-        ", ",
-      )
-      <> "}"
-    Nil -> "null"
-  }
-}
-
-fn stmt_to_js(stmt: Stmt) -> String {
-  case stmt {
-    ExprStmt(expr) -> expr_to_js(expr)
-    Decl(name, expr) ->
-      "let " <> string.join(name, ".") <> " = " <> expr_to_js(expr)
-    Assign(name, expr) -> string.join(name, ".") <> " = " <> expr_to_js(expr)
-    Lambda(params, body) ->
-      "function("
-      <> string.join(params, ", ")
-      <> ") {\n"
-      <> stmts_to_js(body)
-      <> "\n}"
-    Block(stmts) -> "{\n" <> stmts_to_js(stmts) <> "\n}"
-    If(cond, then, else_) ->
-      "if ("
-      <> expr_to_js(cond)
-      <> ") {\n"
-      <> stmts_to_js(then)
-      <> case else_ {
-        [] -> "}\n"
-        _ -> "} else {\n" <> stmts_to_js(else_) <> "}\n"
-      }
-    While(cond, body) ->
-      "while (" <> expr_to_js(cond) <> ") {\n" <> stmts_to_js(body) <> "\n}"
-  }
-}
-
-fn stmts_to_js(stmts: List(Stmt)) -> String {
-  string.join(list.map(stmts, stmt_to_js), ";\n")
+import syntax.{
+  type Program, Block, Dict, ExprStmt, Float, If, Int, Lambda, List, Name,
+  ParenList, Program, String, While,
 }
 
 fn stmt() {
   ops.choice([
-    try_(if__()),
+    if__(),
+    while(),
     block(),
+    lambda(),
     expr() |> map(ExprStmt),
   ])
 }
@@ -122,6 +45,26 @@ fn if__() {
     }),
   )
   pure(If(cond, then, option.unwrap(else_, [])))
+}
+
+fn while() {
+  use <- atto.label("while")
+  use <- drop(match("while") |> ws())
+  use <- drop(token("(") |> ws())
+  use cond <- do(expr())
+  use <- drop(token(")") |> ws())
+  use <- drop(match("do") |> ws())
+  use body <- do(stmts())
+  pure(While(cond, body))
+}
+
+fn lambda() {
+  use <- atto.label("lambda")
+  use <- drop(match("\\") |> ws())
+  use params <- do(ops.sep(name(), by: token(",") |> ws()))
+  use <- drop(match("->") |> ws())
+  use body <- do(stmts())
+  pure(Lambda(params, body))
 }
 
 fn block() {
@@ -247,27 +190,20 @@ fn hex__() {
   }
 }
 
-pub fn parse(input: String, output_id: String) -> Result(String, String) {
+pub fn parse(input: String) -> Result(Program, String) {
   let src = text.new(input)
   let result =
     atto.run(
       {
         use x <- do(stmts())
         use <- drop(atto.eof())
-        pure(x)
+        pure(Program(x, gleam.Nil))
       },
       src,
-      Nil,
+      gleam.Nil,
     )
   case result {
-    Ok(e) ->
-      Ok(
-        "/* Parsed */\ndocument.getElementById('"
-        <> output_id
-        <> "').innerHTML = ("
-        <> json.to_string(json.string(stmts_to_js(e)))
-        <> ").replace(/(\\r\\n|\\n|\\r)/g, '<br>');",
-      )
-    Error(err) -> Error(error.pretty(err, src, False))
+    Ok(e) -> Ok(e)
+    Error(err) -> Error(error.pretty(err, src, True))
   }
 }
