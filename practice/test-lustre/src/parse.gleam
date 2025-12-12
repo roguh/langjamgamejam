@@ -13,7 +13,7 @@ import atto/text_util.{ws}
 
 import tree.{
   type CompilationArtifact, Block, Dict, ExprStmt, Float, If, Int, Lambda, List,
-  Name, ParenList, Program, String, While,
+  Name, ParenList, Program_, String, While,
 }
 
 fn stmt() {
@@ -197,7 +197,7 @@ pub fn parse(input: String) -> CompilationArtifact {
       {
         use x <- do(stmts())
         use <- drop(atto.eof())
-        pure(Program(x, gleam.Nil))
+        pure(Program_(x, gleam.Nil))
       },
       src,
       gleam.Nil,
@@ -208,4 +208,4 @@ pub fn parse(input: String) -> CompilationArtifact {
   }
 }
 
-pub const empty_program = Program([], gleam.Nil)
+pub const empty_program = Program_([], gleam.Nil)

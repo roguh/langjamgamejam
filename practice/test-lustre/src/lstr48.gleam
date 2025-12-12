@@ -11,7 +11,7 @@ import gleam/option.{unwrap}
 
 import games
 import parse
-import tree.{type Program}
+import tree.{type Program_}
 import ui.{p, y}
 
 // import js/generate
@@ -21,7 +21,7 @@ const arena_id = "___annie_arena___"
 type Model {
   Model(
     source: String,
-    compilation_artifact: Result(Program, String),
+    compilation_artifact: Result(Program_, String),
     iteration: Int,
     game_name: String,
     custom_name: String,
