@@ -100,8 +100,21 @@ fn view(model: Model) -> Element(Event) {
   let game_buttons =
     keyed.ul(
       [],
+      // TODO game icons!
       list.map(games.names(), fn(n: String) -> #(String, Element(Event)) {
-        #(n, html.button([event.on_click(LoadGame(n))], [html.text(n)]))
+        #(
+          n,
+          html.button(
+            [
+              y("background-color", games.random_color()),
+              y("margin-right", "1em"),
+              event.on_click(LoadGame(n)),
+            ],
+            [
+              html.text(n),
+            ],
+          ),
+        )
       }),
     )
   html.div(

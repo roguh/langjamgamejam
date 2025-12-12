@@ -1,4 +1,5 @@
 import gleam/dict
+import gleam/list
 import gleam/option.{None, Some}
 
 const games = [
@@ -7,6 +8,21 @@ const games = [
   #("@Pong", "______\n\n\n______"),
   #("@CardsForHumanity", "[card1, card2, judge]"),
 ]
+
+pub fn random_color() -> String {
+  let darkcolors = [
+    "#885733",
+    "#338857",
+    "#573388",
+    "#883388",
+    "#338888",
+    "#888833",
+  ]
+  case list.sample(darkcolors, 1) {
+    [color] -> color
+    _ -> "darkblue"
+  }
+}
 
 pub fn names() -> List(String) {
   dict.keys(dict.from_list(games))
