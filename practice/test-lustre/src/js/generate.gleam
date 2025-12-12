@@ -12,9 +12,9 @@ import syntax.{
 const max_safe_int = 9_007_199_254_740_991
 
 pub fn generate(prog: Program, output_id: String) {
-  "document.getElementById('"
-  <> output_id
-  <> "').innerHTML = ("
+  "document.getElementById("
+  <> json.to_string(json.string(output_id))
+  <> ").innerHTML = ("
   <> json.to_string(json.string(program_to_js(prog)))
   <> ").replace(/(\\r\\n|\\n|\\r)/g, '<br>');"
 }

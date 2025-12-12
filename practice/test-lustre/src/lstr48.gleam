@@ -8,12 +8,13 @@ import lustre/event
 import gleam/int
 import gleam/list
 import gleam/option.{unwrap}
-import gleam/string
 
 import games
-import js/generate
 import parse
-import syntax.{type Program, empty_program}
+import syntax.{type Program}
+import ui.{p, y}
+
+// import js/generate
 
 const arena_id = "___annie_arena___"
 
@@ -31,22 +32,6 @@ type Event {
   UserInput(String)
   LoadGame(String)
   CustomizeName(String)
-}
-
-fn y(key: String, value: String) {
-  attribute.style(key, value)
-}
-
-fn p(content: String) {
-  html.p([], [html.text(content)])
-}
-
-fn code(content: String, color: String) {
-  html.pre([], [
-    html.code([y("color", color)], [
-      html.text(content),
-    ]),
-  ])
 }
 
 fn update(model: Model, event: Event) -> Model {
@@ -81,12 +66,9 @@ fn update(model: Model, event: Event) -> Model {
 
 fn view(model: Model) -> Element(Event) {
   let css_link = "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
-  let result = case model.compilation_artifact {
-    Ok(content) -> code(string.inspect(content), "white")
-    Error(error) -> code(error, "red")
-  }
+  let compilation_view = ui.view(model.compilation_artifact)
   let code = case model.compilation_artifact {
-    Ok(content) -> generate.generate(content, arena_id)
+    Ok(_content) -> "[1]"
     Error(_error) -> ""
   }
   // Use a keyed div to insert a new script element every time the user modifies the source code
@@ -163,19 +145,18 @@ fn view(model: Model) -> Element(Event) {
         attribute.placeholder("Enter game source code"),
         event.on_input(UserInput),
       ]),
-      result,
+      compilation_view,
       script,
     ],
   )
 }
 
 fn init(_args) -> Model {
-  Model("", Ok(empty_program), int.random(2_000_000_000), "", "")
+  Model("", Ok(parse.empty_program), int.random(2_000_000_000), "", "")
 }
 
 pub fn main() {
   let app = lustre.simple(init, update, view)
   let assert Ok(_) = lustre.start(app, "#app", Nil)
-
   Nil
 }

@@ -1,5 +1,4 @@
-import gleam
-
+/// No imports and keep this file minimal.
 /// The Abstract Syntax Tree (AST) for expressions and statements.
 pub type Expr {
   Name(List(String))
@@ -26,4 +25,9 @@ pub type Program {
   Program(stmts: List(Stmt), types: Nil)
 }
 
-pub const empty_program = Program([], gleam.Nil)
+pub type CompilationArtifact =
+  Result(
+    Program,
+    String,
+    // TODO: Richer error type in the future? Improve atto parser?
+  )

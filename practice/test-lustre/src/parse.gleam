@@ -12,8 +12,8 @@ import atto/text.{match}
 import atto/text_util.{ws}
 
 import syntax.{
-  type Program, Block, Dict, ExprStmt, Float, If, Int, Lambda, List, Name,
-  ParenList, Program, String, While,
+  type CompilationArtifact, Block, Dict, ExprStmt, Float, If, Int, Lambda, List,
+  Name, ParenList, Program, String, While,
 }
 
 fn stmt() {
@@ -190,7 +190,7 @@ fn hex__() {
   }
 }
 
-pub fn parse(input: String) -> Result(Program, String) {
+pub fn parse(input: String) -> CompilationArtifact {
   let src = text.new(input)
   let result =
     atto.run(
@@ -207,3 +207,5 @@ pub fn parse(input: String) -> Result(Program, String) {
     Error(err) -> Error(error.pretty(err, src, True))
   }
 }
+
+pub const empty_program = Program([], gleam.Nil)
