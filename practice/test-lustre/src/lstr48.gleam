@@ -11,7 +11,7 @@ import gleam/option.{unwrap}
 
 import games
 import parse
-import syntax.{type Program}
+import tree.{type Program}
 import ui.{p, y}
 
 // import js/generate

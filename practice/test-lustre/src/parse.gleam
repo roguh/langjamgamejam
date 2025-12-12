@@ -11,7 +11,7 @@ import atto/ops
 import atto/text.{match}
 import atto/text_util.{ws}
 
-import syntax.{
+import tree.{
   type CompilationArtifact, Block, Dict, ExprStmt, Float, If, Int, Lambda, List,
   Name, ParenList, Program, String, While,
 }
@@ -204,7 +204,7 @@ pub fn parse(input: String) -> CompilationArtifact {
     )
   case result {
     Ok(e) -> Ok(e)
-    Error(err) -> Error(error.pretty(err, src, True))
+    Error(err) -> Error(error.pretty(err, src, False))
   }
 }
 

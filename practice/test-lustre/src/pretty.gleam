@@ -3,7 +3,7 @@ import gleam/int
 import gleam/list
 import gleam/string
 
-import syntax.{
+import tree.{
   type Expr, type Program, type Stmt, Assign, Block, Decl, Dict, ExprStmt, Float,
   If, Int, Lambda, List, Name, Nil, ParenList, String, While,
 }

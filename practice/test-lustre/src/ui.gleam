@@ -3,7 +3,7 @@ import lustre/element.{type Element}
 import lustre/element/html
 
 import pretty
-import syntax.{type CompilationArtifact}
+import tree.{type CompilationArtifact}
 
 pub fn y(key: String, value: String) {
   attribute.style(key, value)
