@@ -39,7 +39,7 @@ pub fn load(game_str: String) -> String {
 /// Get a game or try and load raw source code directly
 pub fn name(game_str: String) -> option.Option(String) {
   case dict.get(dict.from_list(games), game_str) {
-    Ok(game) -> Some(game)
+    Ok(_) -> Some(game_str)
     _ -> None
   }
 }

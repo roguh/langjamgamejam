@@ -21,13 +21,13 @@ pub type Stmt {
   While(Expr, List(Stmt))
 }
 
-pub type Program_ {
-  Program_(stmts: List(Stmt), types: Nil)
+pub type AnnieProgram {
+  AnnieProgram(stmts: List(Stmt), types: Nil)
 }
 
 pub type CompilationArtifact =
   Result(
-    Program_,
+    AnnieProgram,
     String,
     // TODO: Richer error type in the future? Improve atto parser?
   )

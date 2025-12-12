@@ -10,18 +10,17 @@ import gleam/list
 import gleam/option.{unwrap}
 
 import games
+import js/generate
 import parse
-import tree.{type Program_}
+import tree.{type AnnieProgram}
 import ui.{p, y}
-
-// import js/generate
 
 const arena_id = "___annie_arena___"
 
 type Model {
   Model(
     source: String,
-    compilation_artifact: Result(Program_, String),
+    compilation_artifact: Result(AnnieProgram, String),
     iteration: Int,
     game_name: String,
     custom_name: String,
@@ -68,7 +67,7 @@ fn view(model: Model) -> Element(Event) {
   let css_link = "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
   let compilation_view = ui.view(model.compilation_artifact)
   let code = case model.compilation_artifact {
-    Ok(_content) -> "[1]"
+    Ok(content) -> generate.generate(content, arena_id)
     Error(_error) -> ""
   }
   // Use a keyed div to insert a new script element every time the user modifies the source code
@@ -111,8 +110,8 @@ fn view(model: Model) -> Element(Event) {
         attribute.type_("text/css"),
         attribute.href(css_link),
       ]),
-      html.h1([], [html.text(model.game_name)]),
       game_buttons,
+      html.h1([], [html.text(model.game_name)]),
       html.div(
         [
           y("min-height", "80vh"),

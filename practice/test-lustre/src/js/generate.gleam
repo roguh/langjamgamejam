@@ -5,13 +5,13 @@ import gleam/list
 import gleam/string
 
 import tree.{
-  type Expr, type Program_, type Stmt, Assign, Block, Decl, Dict, ExprStmt, Float,
+  type Expr, type AnnieProgram, type Stmt, Assign, Block, Decl, Dict, ExprStmt, Float,
   If, Int, Lambda, List, Name, Nil, ParenList, String, While,
 }
 
 const max_safe_int = 9_007_199_254_740_991
 
-pub fn generate(prog: Program_, output_id: String) {
+pub fn generate(prog: AnnieProgram, output_id: String) {
   "document.getElementById("
   <> json.to_string(json.string(output_id))
   <> ").innerHTML = ("
@@ -75,6 +75,6 @@ fn stmts_to_js(stmts: List(Stmt)) -> String {
   string.join(list.map(stmts, stmt_to_js), ";\n")
 }
 
-fn program_to_js(prog: Program_) -> String {
+fn program_to_js(prog: AnnieProgram) -> String {
   stmts_to_js(prog.stmts)
 }

@@ -4,7 +4,7 @@ import gleam/list
 import gleam/string
 
 import tree.{
-  type Expr, type Program_, type Stmt, Assign, Block, Decl, Dict, ExprStmt, Float,
+  type Expr, type AnnieProgram, type Stmt, Assign, Block, Decl, Dict, ExprStmt, Float,
   If, Int, Lambda, List, Name, Nil, ParenList, String, While,
 }
 
@@ -62,7 +62,7 @@ pub fn pretty_stmt(s: Stmt) {
   }
 }
 
-pub fn pretty(prog: Program_) -> String {
+pub fn pretty(prog: AnnieProgram) -> String {
   let r = string.join(list.map(prog.stmts, pretty_stmt), "\n")
   "// " <> int.to_string(string.length(r)) <> "bytes.\n" <> r
 }
