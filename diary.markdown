@@ -107,20 +107,54 @@ Kaplay avoids for-loops and other imperative control structures, so it is quite 
 
 
 
-# Prep day 5: More evaluation and JS vs. Scheme
+# Prep day 5 and 6: More evaluation and JS vs. Scheme
 
-This is day 5 of preparing for Langjam Gamejam, a fun new competition where participants will build a programming language and a videogame using their new language.
+This is day 5 and day 6 of preparing for Langjam Gamejam, a fun new competition where participants will build a programming language and a videogame using their new language.
+
+(I'm posting this late, this happened a few days ago.)
 
 My goal is to write a Haskell compiler for a Scheme-like language (Lisp) targeting JavaScript.
 
-double and explicit/implicit bigint
-dicts
-bigint, fft in scheme
-tons of new stdlib required, list construction and iteration, no for-loops! heavily using JS immutable features like array cloning
-should i use scheme or js or both? scheme is wordier but js is harder
-clojure inspiration
+Added features:
+- Double syntax, and both explicit and implicit bigint
+- Dicts
+- Bigint, fft in scheme
+- Tons of new stdlib required, list construction and iteration, no for-loops! heavily using JS immutable features like array cloning.
+- Should I use scheme or js or both? scheme is wordier but js is harder.
+- Clojure is good inspiration.
 
-dreams: LSP, good repl with autocomplete, python-style docstrings, numpy/pandas inspiration for easy numeric programming, formatter, AI-friendly AGENTS.md for working with this lang
-live FFT of mic data; make this JUST AS FAST as good javascript
+Dreams: LSP, good repl with autocomplete, python-style docstrings, numpy/pandas inspiration for easy numeric programming, formatter, AI-friendly AGENTS.md for working with this lang.
 
-what videogame will we write with this lang? stick around to find out!
+Live FFT (spectrogram) of mic data. Make the generated code JUST AS FAST as well-written JavaScript.
+
+What videogame will we write with this lang? stick around to find out!
+
+# Prep day 7: GLEAM!
+
+This is day 7 of preparing for Langjam Gamejam, a fun new competition where participants will build a programming language and a videogame using their new language.
+
+I've reflected on which languages I want to dedicate my time to, and I've changed my mind on the plan for the hackathon, which starts tomorrow Saturday at 10AM Mountain Time (UTC-7).
+
+My goal is to write a compiler in Gleam targeting the web browser.
+The source language will be Python-like. Maybe a Python with curly braces to make parsing easier.
+I don't want to waste time on parsing when I only have 7 days.
+The target language will be JavaScript.
+
+In just a few hours, I built an HTML/CSS webapp using Gleam's Lustre framework.
+It is pleasant to work with and very productive if you've used languages like Haskell and Ocaml before.
+The webapp seems fairly efficient.
+Gleam was easy to configure, it even has hot code-reloading to make it easier to test and debug while I'm developing my compiler.
+
+Because langjamgamejam is a language and game competition, I built a simple code editor in Gleam today to prepare.
+My webapp allows the user to load a predefined program, edit its source code, and it compiles and runs the source code directly in the web browser.
+I'm only parsing a JSON-like subset of JavaScript, not my new Python-like language!
+
+I'm quite happy with Gleam.
+
+I'm also collaborating with a friend, who's a published writer and fond of science fiction.
+We're working on a pretty cool story.
+Hopefully I can express enough of my friend's writing in the videogame next week :)
+
+I'll also draw as much as possible, especially organic elements like overgrown trees and mossy drones.
+
+Wish us luck! And good luck to all lovers of programming languages, linguistics, and videogames!
