@@ -4,11 +4,13 @@ import kaplay from "kaplay";
 // Use k. prefix anyway to get better autocomplete
 const k = kaplay();
 
+import { pickAnim } from "./util";
+import { saveTime, loadGame, fastSaveGame } from "./save";
+
 k.setGravity(1000);
 const [CW, CH] = [100, 210];
 const [TW, TH] = [100, 100];
 const [PW, PH] = [CW, CH];
-k.debug.inspect = true;
 
 k.loadRoot("./"); // A good idea for Itch.io publishing later
 k.loadSprite("bean", "sprites/bean.png");
@@ -71,18 +73,29 @@ const map = k.addLevel(
   },
 );
 
-const pickAnim = (entity, animName = "idle") => {
-  if (entity.isJumping()) animName = "jump";
-  if (player.hasAnim(`${animName}_roll`) && player.isRolling)
-    animName = `${animName}_roll`;
-  if (entity.curAnim() != animName) entity.play(animName);
-};
+const txt = k.add([
+  "text",
+  k.pos(15, 40),
+  k.fixed(),
+  k.text("", { size: 30 }),
+  {
+    lastUpdate: 0,
+    update: () => {
+      if (k.time() - txt.lastUpdate > 1) {
+        const fps = Math.floor(10 / k.dt()) / 10;
+        txt.lastUpdate = k.time();
+        txt.text = `FPS: ${fps}`;
+      }
+    },
+  },
+]);
 
 const player = k.add([
   "mover",
   "player",
   k.sprite("sama"),
   k.area(),
+  // TODO anchor point stays static when rolling
   k.anchor("center"),
   k.body(),
   k.doubleJump(),
@@ -94,7 +107,6 @@ const player = k.add([
     direction: "right",
     isRolling: false,
     mineSpeed: 20,
-    // TODO anchor point stays static when rolling
     shape: new k.Rect(k.vec2(0, (PH * (1 - 0.7)) / 2), PW / 2, PH * 0.7),
     rollShape: new k.Rect(k.vec2(0, (PH * (1 - 0.25)) / 2), PW / 2, PH * 0.25),
     roll: (v: boolean) => {
@@ -122,30 +134,12 @@ const player = k.add([
   },
 ]);
 
-const fastSaveGame = () => {
-  localStorage.setItem(
-    "lstr48Save",
-    JSON.stringify({
-      player: player.toSaveFile(),
-    }),
-  );
-};
-
-const loadGame = () => {
-  const savedGame = localStorage.getItem("lstr48Save");
-  if (savedGame) {
-    const { player: p } = JSON.parse(savedGame);
-    player.fromSaveFile(p);
-  }
-};
-
 // Initialization
 map.use(k.scale(0.78));
-let lastSaveTime = -10;
 k.onLoad(() => {
   player.init();
   k.setCamScale(1.3);
-  loadGame();
+  loadGame(player);
 });
 
 k.onKeyPress("up", () => {
@@ -174,6 +168,13 @@ k.onKeyDown("left", () => {
 
 k.onKeyRelease("right", () => pickAnim(player));
 k.onKeyRelease("left", () => pickAnim(player));
+
+k.onMouseRelease(() => {
+  console.log(k.mousePos().dist(txt.pos));
+  if (k.mousePos().dist(txt.pos) < txt.width)
+    k.debug.inspect = !k.debug.inspect;
+});
+
 k.onCollide("mover", "solid", (a, b) => {
   // Stop jump animation if on ground
   pickAnim(player);
@@ -181,7 +182,10 @@ k.onCollide("mover", "solid", (a, b) => {
 
 k.onCollideUpdate("player", "solid", (a, b, col) => {
   const canMine = a.canMine() && b.health !== undefined && col?.normal.y === 0;
-  if (canMine && b.health > 0) b.health -= a.mineSpeed * k.dt();
+  if (canMine && b.health > 0) {
+    b.health -= a.mineSpeed * k.dt();
+    k.shake(0.1);
+  }
   if (canMine && b.health <= 0) {
     b.destroy();
     k.shake(30);
@@ -189,10 +193,11 @@ k.onCollideUpdate("player", "solid", (a, b, col) => {
 });
 
 k.onUpdate(() => {
+  txt.update();
   k.setCamPos(player.pos.x, player.pos.y);
   // Save every 1 second
-  if (k.time() - lastSaveTime > 1) {
-    lastSaveTime = k.time();
-    fastSaveGame();
+  if (k.time() - saveTime() > 1) {
+    saveTime(k.time());
+    fastSaveGame(player);
   }
 });
