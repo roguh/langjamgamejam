@@ -2,6 +2,7 @@ import gleam/dict
 import gleam/list
 import gleam/option.{None, Some}
 
+// TODO use gleam-embeds library
 const games = [
   #("@TicTacToe", "[[1,2,3],[4,5,6],[7,8,9]]"),
   #("@Chess", "[R, N, B, Q, K, B, N, R]"),
