@@ -6,6 +6,7 @@ const k = kaplay();
 
 import { pickAnim } from "./util";
 import { saveTime, loadGame, fastSaveGame } from "./save";
+import { makeTextButton } from "kaplay-ui/inputs";
 
 k.setGravity(1000);
 const [CW, CH] = [100, 210];
@@ -82,9 +83,9 @@ const txt = k.add([
     lastUpdate: 0,
     update: () => {
       if (k.time() - txt.lastUpdate > 1) {
-        const fps = Math.floor(10 / k.dt()) / 10;
+        const fps = (1 / k.dt()).toFixed(1);
+        txt.text = `FPS: ${fps} ${player.pos.x.toFixed(1)},${player.pos.y.toFixed(1)}`;
         txt.lastUpdate = k.time();
-        txt.text = `FPS: ${fps}`;
       }
     },
   },
@@ -103,7 +104,7 @@ const player = k.add([
   {
     initPos: k.vec2(300, 80),
     speed: 200,
-    jump_force: 400,
+    jump_force: 500,
     direction: "right",
     isRolling: false,
     mineSpeed: 20,
@@ -135,45 +136,74 @@ const player = k.add([
 ]);
 
 // Initialization
-map.use(k.scale(0.78));
 k.onLoad(() => {
+  map.use(k.scale(0.78));
   player.init();
   k.setCamScale(1.3);
   loadGame(player);
 });
 
-k.onKeyPress("up", () => {
-  player.doubleJump(player.jump_force);
-  pickAnim(player);
-});
+const actions = {
+  lastDown: 0,
+  lastUp: 0,
+  reset: () => player.moveTo(player.initPos),
+  up: () => {
+    // TODO allow holding the up button to double jump the maximum height...
+    player.doubleJump(player.jump_force);
+    pickAnim(player);
+    actions.lastUp = k.time();
+  },
+  left: () => {
+    pickAnim(player, "move");
+    player.flipX = true;
+    player.move(-player.speed, 0);
+  },
+  downStart: () => {
+    player.roll(!player.isRolling);
+    pickAnim(player);
+    actions.lastDown = k.time();
+  },
+  right: () => {
+    pickAnim(player, "move");
+    player.flipX = false;
+    player.move(player.speed, 0);
+  },
+  clickOrTouchStart: (pos) => {
+    if (pos.dist(txt.pos) < txt.width) {
+      k.debug.inspect = !k.debug.inspect;
+    }
+  },
+  clickOrTouch: (pos) => {
+    if (pos.dist(buttons.up.pos) < buttons.up.width) {
+      if (k.time() - actions?.lastUp > 0.25) actions.up();
+    }
+    if (pos.dist(buttons.left.pos) < buttons.left.width) {
+      actions.left();
+    }
+    if (pos.dist(buttons.down.pos) < buttons.down.width / 2) {
+      if (k.time() - actions?.lastDown > 1) actions.downStart();
+    }
+    if (pos.dist(buttons.right.pos) < buttons.right.width) {
+      actions.right();
+    }
+  },
+};
 
-// TODO do not standup if no vertical space
-k.onKeyRelease("down", () => player.roll(!player.isRolling));
-
-k.onKeyPress("q", () => {
-  player.moveTo(player.initPos);
-});
-
-k.onKeyDown("right", () => {
-  pickAnim(player, "move");
-  player.flipX = false;
-  player.move(player.speed, 0);
-});
-
-k.onKeyDown("left", () => {
-  pickAnim(player, "move");
-  player.flipX = true;
-  player.move(-player.speed, 0);
-});
-
-k.onKeyRelease("right", () => pickAnim(player));
-k.onKeyRelease("left", () => pickAnim(player));
-
-k.onMouseRelease(() => {
-  console.log(k.mousePos().dist(txt.pos));
-  if (k.mousePos().dist(txt.pos) < txt.width)
-    k.debug.inspect = !k.debug.inspect;
-});
+k.onKeyPress("0", actions.reset);
+k.onKeyPress("up", actions.up);
+k.onKeyDown("left", actions.left);
+k.onKeyPress("down", actions.downStart);
+k.onKeyDown("right", actions.right);
+k.onKeyPress("w", actions.up);
+k.onKeyDown("a", actions.left);
+k.onKeyPress("s", actions.downStart);
+k.onKeyDown("d", actions.right);
+k.onMousePress(() => actions.clickOrTouchStart(k.mousePos()));
+k.onMouseDown(() => actions.clickOrTouch(k.mousePos()));
+if (k.isTouchscreen()) {
+  k.onTouchStart(actions.clickOrTouchStart);
+  k.onTouchMove(actions.clickOrTouch);
+}
 
 k.onCollide("mover", "solid", (a, b) => {
   // Stop jump animation if on ground
@@ -192,9 +222,26 @@ k.onCollideUpdate("player", "solid", (a, b, col) => {
   }
 });
 
+// Mobile touch controls
+const bD = 150;
+const [SW, SH] = [2.5 * bD, window.innerHeight - 3 * bD];
+const buttons = {
+  left: k.add(makeTextButton("<", SW - 2 * bD, SH, bD, bD)),
+  right: k.add(makeTextButton(">", SW, SH, bD, bD)),
+  up: k.add(makeTextButton("^", SW - bD, SH - bD, bD, bD)),
+  down: k.add(makeTextButton("v", SW - bD, SH + bD, bD, bD)),
+};
+// Each button is in a fixed position
+Object.values(buttons).map((b) => b.use(k.fixed()));
+
 k.onUpdate(() => {
   txt.update();
   k.setCamPos(player.pos.x, player.pos.y);
+
+  // Fall off map?
+  if (player.pos.y > 10000) {
+    actions.reset();
+  }
   // Save every 1 second
   if (k.time() - saveTime() > 1) {
     saveTime(k.time());
