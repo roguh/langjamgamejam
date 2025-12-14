@@ -9,8 +9,8 @@ import { saveTime, loadGame, fastSaveGame } from "./save";
 import { makeTextButton } from "kaplay-ui/inputs";
 
 k.setGravity(1000);
-const [CW, CH] = [100, 210];
-const [TW, TH] = [100, 100];
+const [CW, CH] = [150, 210]; // Size for humanoid sprites
+const [TW, TH] = [100, 100]; // Size for terrain tile sprites
 const [PW, PH] = [CW, CH];
 
 k.loadRoot("./"); // A good idea for Itch.io publishing later
@@ -24,16 +24,36 @@ k.loadSpriteAtlas("sprites/sama.png", {
   sama: {
     x: 0,
     y: 0,
-    width: CW * 20,
+    width: CW * 11,
     height: CH,
-    sliceX: 20,
+    sliceX: 11,
     anims: {
       idle: { from: 0, to: 0 },
-      move: { from: 0, to: 2 },
-      jump: { from: 3, to: 4 },
-      idle_roll: { from: 8, to: 8 },
-      jump_roll: { from: 8, to: 11 },
-      move_roll: { from: 8, to: 11 },
+      move: { from: 1, to: 8, loop: true, pingpong: false, speed: 12 },
+      jump: { from: 9, to: 9 },
+      fall: { from: 10, to: 10 },
+    },
+  },
+  sama_sneak: {
+    x: 0,
+    y: CH,
+    width: CW * 11,
+    height: CH,
+    sliceX: 11,
+    anims: {
+      idle: { from: 0, to: 0 },
+      move: { from: 0, to: 5, loop: true, pingpong: false, speed: 12 },
+    },
+  },
+  sama_roll: {
+    x: 0,
+    y: CH * 2,
+    width: CW * 11,
+    height: CH,
+    sliceX: 11,
+    anims: {
+      idle: { from: 0, to: 0 },
+      move: { from: 0, to: 11, loop: true, pingpong: false, speed: 15 },
     },
   },
 });
@@ -104,17 +124,18 @@ const player = k.add([
   {
     initPos: k.vec2(300, 80),
     speed: 200,
-    jump_force: 500,
+    jump_force: 700,
     direction: "right",
     isRolling: false,
     mineSpeed: 20,
+    baseSprite: "sama",
+    rollSprite: "sama_sneak",
     shape: new k.Rect(k.vec2(0, (PH * (1 - 0.7)) / 2), PW / 2, PH * 0.7),
-    rollShape: new k.Rect(k.vec2(0, (PH * (1 - 0.25)) / 2), PW / 2, PH * 0.25),
+    rollShape: new k.Rect(k.vec2(0, (PH * (1 - 0.45)) / 2), PW / 2, PH * 0.45),
     roll: (v: boolean) => {
       // TODO Avoid collision when standing up
       player.isRolling = v;
       player.area.shape = player.isRolling ? player.rollShape : player.shape;
-      pickAnim(player);
     },
     canMine: () => player.isRolling,
     init: () => {
@@ -137,9 +158,9 @@ const player = k.add([
 
 // Initialization
 k.onLoad(() => {
-  map.use(k.scale(0.78));
+  map.use(k.scale(0.95));
   player.init();
-  k.setCamScale(1.3);
+  k.setCamScale(1.5);
   loadGame(player);
 });
 
@@ -148,32 +169,40 @@ const actions = {
   lastUp: 0,
   reset: () => player.moveTo(player.initPos),
   up: () => {
+    console.debug("action.up");
     // TODO allow holding the up button to double jump the maximum height...
     player.doubleJump(player.jump_force);
     pickAnim(player);
     actions.lastUp = k.time();
   },
   left: () => {
+    console.debug("action.left");
+    player.move(-player.speed, 0);
     pickAnim(player, "move");
     player.flipX = true;
-    player.move(-player.speed, 0);
   },
+  leftStop: () => pickAnim(player),
   downStart: () => {
+    console.debug("action.downStart");
     player.roll(!player.isRolling);
     pickAnim(player);
     actions.lastDown = k.time();
   },
   right: () => {
+    console.debug("action.right");
+    player.move(player.speed, 0);
     pickAnim(player, "move");
     player.flipX = false;
-    player.move(player.speed, 0);
   },
+  rightStop: () => pickAnim(player),
   clickOrTouchStart: (pos) => {
+    console.debug("action.clickOrTouchStart");
     if (pos.dist(txt.pos) < txt.width) {
       k.debug.inspect = !k.debug.inspect;
     }
   },
   clickOrTouch: (pos) => {
+    console.debug("action.clickOrTouch");
     if (pos.dist(buttons.up.pos) < buttons.up.width) {
       if (k.time() - actions?.lastUp > 0.25) actions.up();
     }
@@ -198,6 +227,10 @@ k.onKeyPress("w", actions.up);
 k.onKeyDown("a", actions.left);
 k.onKeyPress("s", actions.downStart);
 k.onKeyDown("d", actions.right);
+k.onKeyRelease("a", actions.leftStop);
+k.onKeyRelease("d", actions.rightStop);
+k.onKeyRelease("left", actions.leftStop);
+k.onKeyRelease("right", actions.rightStop);
 k.onMousePress(() => actions.clickOrTouchStart(k.mousePos()));
 k.onMouseDown(() => actions.clickOrTouch(k.mousePos()));
 if (k.isTouchscreen()) {
@@ -232,7 +265,10 @@ const buttons = {
   down: k.add(makeTextButton("v", SW - bD, SH + bD, bD, bD)),
 };
 // Each button is in a fixed position
-Object.values(buttons).map((b) => b.use(k.fixed()));
+Object.values(buttons).map((b) => {
+  b.use(k.fixed());
+  if (!k.isTouchscreen()) b.hidden = true;
+});
 
 k.onUpdate(() => {
   txt.update();
