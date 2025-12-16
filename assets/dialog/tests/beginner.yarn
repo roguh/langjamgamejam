@@ -1,0 +1,26 @@
+title: Start
+---
+Narrator: Hi, I'm the narrator for the documentation!
+===
+
+title: Cave
+---
+// This comment is ignored :)
+Narrator: Let's look inside the spooky cave...
+<<jump Adventure>>
+===
+
+title: Adventure
+---
+Narrator: Let's go on an adventure!
+-> Ok! Let's go!
+  <<jump Cave>>
+-> I don't want to go on an adventure...
+  // This line only runs
+  Narrator: Oh, Ok then.
+===
+
+title: Credits
+---
+Dialogue powered by Yarn Spinner https://yarnspinner.dev
+===

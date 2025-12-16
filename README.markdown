@@ -1,6 +1,6 @@
 # LangJamGameJam 2025: Build a language and write a game in it
 
-![Langjam Gamejam logo: black and white pixel art of a fierce dragon with an outstretched claw and a mouth ready to breathe fire.](./img/langjamgamejam.png)
+![Langjam Gamejam logo: black and white pixel art of a fierce dragon with an outstretched claw and a mouth ready to breathe fire.](./assets/sprites/langjamgamejam.png)
 
 
 We started planning on December 2nd and settled on Haskell as the implementation language.

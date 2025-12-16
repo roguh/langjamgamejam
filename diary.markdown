@@ -158,3 +158,20 @@ Hopefully I can express enough of my friend's writing in the videogame next week
 I'll also draw as much as possible, especially organic elements like overgrown trees and mossy drones.
 
 Wish us luck! And good luck to all lovers of programming languages, linguistics, and videogames!
+
+# Diary: Day 1
+
+Yarn Spinner dialog compiler to Kaplay.
+Make it easy to compile Yarn scripts to other game frameworks as well.
+Substantial tests.
+
+```
+# install gleam
+gleam new project-name
+gleam add lustre atto gleam_json
+gleam add --dev lustre_dev_tools
+gleam run -m lustre/dev start
+```
+
+Python-like syntax?
+Animation language?
