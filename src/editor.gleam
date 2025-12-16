@@ -8,7 +8,6 @@ import lustre/event
 import gleam/int
 import gleam/list
 import gleam/option.{unwrap}
-import gleam/string
 
 import lang/yarn/assets
 import lang/yarn/ast
@@ -60,7 +59,6 @@ fn update(model: Model, event: Event) -> Model {
 
 fn view(model: Model) -> Element(Event) {
   let css_link = "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
-  let compilation_view = ui.view(model.comp)
   let code = case model.comp {
     Ok(content) -> generate.generate(content, arena_id)
     Error(_error) -> ""
@@ -110,74 +108,18 @@ fn view(model: Model) -> Element(Event) {
       i(err),
       html.div(
         [
-          y("min-height", "40vh"),
           attribute.id(arena_id),
         ],
         [],
       ),
-      html.h2([], [html.text("Hello, world! It's game making time :)")]),
       p(
         "It appears you've found a super fun code editor for the game shown above!",
       ),
-      html.div(
-        [
-          y("display", "flex"),
-          y("flex-direction", "row"),
-        ],
-        [
-          html.div(
-            [
-              y("min-height", "10em"),
-              y("padding", "14px"),
-              y("padding-bottom", "0px"),
-              y("background-color", "black"),
-            ],
-            model.source
-              |> string.split("\n")
-              |> list.index_map(fn(_, ix) {
-                html.p(
-                  [
-                    y("margin", "0"),
-                    y("padding", "0 2px"),
-                    y("padding-top", "0.4px"),
-                    y(
-                      "background-color",
-                      ast.error_in(model.comp, ix + 1, "black", "darkred"),
-                    ),
-                  ],
-                  [
-                    html.text(ix + 1 |> int.to_string),
-                  ],
-                )
-              }),
-          ),
-          html.textarea(
-            [
-              y("min-height", "10em"),
-              y("margin-bottom", "0"),
-              event.on_input(UserInput),
-            ],
-            model.source,
-          ),
-          html.button(
-            [
-              y("background-color", "darkblue"),
-              y("margin-left", "1em"),
-              y("max-height", "3em"),
-              attribute.type_("button"),
-            ],
-            [
-              html.text("Download"),
-            ],
-          ),
-        ],
-      ),
-      compilation_view,
+      ui.editor(model.source, model.comp, UserInput),
+      ui.view(model.comp),
       script,
       html.figure([], [
         html.img([
-          y("height", "20vh"),
-          y("min-height", "200px"),
           attribute.src("https://cdn2.thecatapi.com/images/b7k.jpg"),
         ]),
         html.figcaption([y("font-y", "italic")], [
@@ -193,7 +135,7 @@ fn view(model: Model) -> Element(Event) {
 }
 
 fn init(_args) -> Model {
-  let t = "/tests/story.yarn"
+  let t = "/tests/choices.yarn"
   let foxnews = ["She is", "He is", "They are"]
   let cat_is = case list.sample(foxnews, 1) {
     [n] -> n

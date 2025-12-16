@@ -159,7 +159,11 @@ I'll also draw as much as possible, especially organic elements like overgrown t
 
 Wish us luck! And good luck to all lovers of programming languages, linguistics, and videogames!
 
-# Diary: Day 1
+# Diary: Day 1 and 2
+
+Animation, platformer movement similar to Hollow Knight
+
+# Diary: Day 3
 
 Yarn Spinner dialog compiler to Kaplay.
 Make it easy to compile Yarn scripts to other game frameworks as well.
@@ -175,3 +179,34 @@ gleam run -m lustre/dev start
 
 Python-like syntax?
 Animation language?
+
+# Diary: Day 3 and 4
+
+This is day 4 of the Langjam Gamejam, a fun new 7-day hackathon where participants are building a programming language and a videogame using their new language.
+
+I spent this weekend drawing, animating, and building good controls for a platformer in the Kaplay game engine for web browsers. This is my first time animating a human figure and I'm quite happy with the character's motion, though your opinion may vary.
+
+Still, I couldn't think of an interesting programming language to implement as part of the langjamgamejam, a 7 day hackathon where participants are building a videogame and a programming language. Monday evening, I looked into languages for implementing videogame dialogue and storytelling systems. Yarn Spinner is writer-friendly, yet it is a complete programming language. By late Monday night, I had a basic Yarn parser running in Gleam on my browser.
+
+I am now implementing a nearly-complete Yarn parser and VM in Gleam for the browser. I'm omitting indent-sensitive grammar and Yarn's cool new Saliency features. I recall the gamejam discord had a good discussion on implementing whitespace-sensitive parses, like Python's and Haskell's, but I'll save this work for later.
+
+I will integrate the Yarn VM into my platform videogame built using Javascript Kaplay. I will continue to support live code editing, but only for Yarn files so that users can modify in-game conversations and observe their changes live!
+
+Yarn is a Turing complete language and I'd like to practice my VM implementation skills. As a stretch goal, I'll also add for-loops, lists, and mathematical functions to my Yarn VM. I'll run some benchmarking compared to general purpose languages. A more practical Yarn extensions would be using generative AI for more dynamic speech patterns, or integrating with multiplayer games.
+
+In terms of languages, I believe JavaScript and HTML strike a good balance between performance and readability, especially for newcomers and people not interested in learning programming.
+This is why I'm liking Yarn.
+It has a lightweight syntax that lets writers use as much or as little of Yarn's programming features as they need.
+
+My friend, a published writer, is contributing her talent to write a good story for the game. We've both dreamed of building videogames. The game (and editor) will be available on the nearest web browser near you. Stay tuned!
+
+
+title: YarnInKaplayInGleamIn7Days
+---
+Ready to continue?
+-> No?
+-> Yes!
+-> What an interesting Yarn example.
+  Indeed
+  <<jump>>
+===

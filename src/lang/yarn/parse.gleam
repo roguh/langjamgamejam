@@ -1,32 +1,19 @@
-import gleam/float
-import gleam/int
-import gleam/list
 import gleam/option
-import gleam/result
 
-import atto.{type ParseError, do, drop, fail_msg, map, pure, token}
+import atto.{do, drop, pure, token}
 import atto/error
 import atto/ops
 import atto/text.{match}
+import atto/text_util
 
 import lang/yarn/ast
 
 fn comment() {
   use <- atto.label("comment")
-  use yes <- do(
-    atto.try({
-      use <- drop(token("/"))
-      use <- drop(token("/"))
-      pure(Nil)
-    }),
-  )
-  case yes {
-    option.Some(_) -> {
-      use <- drop(match("[^\n]*"))
-      pure(Nil)
-    }
-    _ -> pure(Nil)
-  }
+  atto.try({
+    use <- drop(match("//[^\n]*"))
+    pure(Nil)
+  })
 }
 
 fn hs(p) {
@@ -37,10 +24,10 @@ fn hs(p) {
 }
 
 fn ws(p) {
-  use <- atto.label("newline")
-  use x <- do(p)
-  use <- drop(match("[ \t\n]*"))
-  use <- drop(comment())
+  use <- atto.label("spaces")
+  use x <- do(p |> text_util.ws())
+  // TODO ops.many() doesn't work well with empty parsers
+  use <- drop(comment() |> text_util.ws())
   pure(x)
 }
 
@@ -51,22 +38,55 @@ fn yarn_key() {
 }
 
 fn dialog_line() {
-  use <- atto.label("yarn dialog line")
+  use <- atto.label("dialog line")
   use name <- do(atto.try(yarn_key()))
-  use text <- do(match("[^=\n]+") |> ws())
-  pure(ast.Line(text, name))
+  use text <- do(match("[^<{}=\n]+") |> ws())
+  let tags = []
+  pure(ast.Line([ast.Text(text)], name, tags))
+}
+
+fn choices() {
+  use <- atto.label("choices")
+  use <- drop(match("->") |> hs())
+  use text <- do(match("[^=<{}\n]+") |> ws())
+  use choices <- do(
+    atto.try({
+      use <- drop(token("{") |> ws())
+      use x <- do(yarn_body())
+      use <- drop(token("}") |> ws())
+      pure(x)
+    }),
+  )
+  let tags = []
+  let cond = option.None
+  pure(ast.Choice([ast.Text(text)], option.unwrap(choices, []), tags, cond))
+}
+
+fn jump() {
+  use <- atto.label("jump label")
+  use <- drop(match("jump") |> ws())
+  use label <- do(match("[a-zA-Z][a-zA-Z0-9_]*") |> ws())
+  pure(ast.Jump(label))
+}
+
+fn command() {
+  use <- atto.label("command")
+  use <- drop(match("<<") |> ws())
+  use cmd <- do(ops.choice([jump()]))
+  use <- drop(match(">>") |> ws())
+  pure(ast.Command(cmd))
 }
 
 fn yarn_body() {
-  use <- atto.label("yarn body")
-  use lines <- do(ops.many(dialog_line()))
+  use <- atto.label("body")
+  use lines <- do(ops.many(ops.choice([command(), choices(), dialog_line()])))
   pure(lines)
 }
 
 fn header() {
-  use <- atto.label("yarn header")
+  use <- atto.label("header")
   use key <- do(yarn_key())
-  use value <- do(match("[a-zA-Z][a-zA-Z0-9_]*") |> ws())
+  use value <- do(match("[^\n/]*") |> ws())
   pure(#(key, value))
 }
 

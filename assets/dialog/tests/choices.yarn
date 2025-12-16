@@ -1,0 +1,21 @@
+title: Adventure
+---
+Narrator: Let's go on an adventure!
+-> Ok! Let's go!
+-> Ok! In a bit!
+{ They depart in a few minutes }
+-> I don't want to go on an adventure...
+{
+  // This line only runs
+  Narrator: Oh, Ok then.
+  -> choice2
+    {
+        A bear!
+        // Comment!
+        -> punch
+        -> roll
+        -> shoot
+    }
+}
+And so the story continues
+===
