@@ -3,7 +3,7 @@ import { wrap } from "../utils";
 
 const [W, H] = [1024, 768];
 
-const DEV_MODE = false;
+const DEV_MODE = true;
 const PHI = 0.5 + 5 ** 0.5 * 0.5;
 // const MAX_DIALOGUE = ".......................".length; // for width 300*PHI
 // const MAX_DIALOGUE = "................................".length; // for width 400*PHI
@@ -14,14 +14,14 @@ const INIT_DIALOGUE = "";
 
 const playerConst = {
   // Speed in px/sec
-  horiz: 160,
-  dashHoriz: 400,
+  horiz: 260,
+  dashHoriz: 750,
   vert: 430,
   // Durations in milliseconds
-  dashDuration: 1000,
+  dashDuration: 700,
   restDuration: 2000,
   // Distance in px
-  dialogueDistance: 120,
+  dialogueDistance: 80,
   ////  dialogueDistance: 700, // useful for testing
   itemDistance: 95,
 };
@@ -51,6 +51,7 @@ export class Game extends Scene {
   public dialogueText: Phaser.GameObjects.Text;
   public dialogueHow: Phaser.GameObjects.Text;
   public statusText: Phaser.GameObjects.Text;
+  public dashBar: Phaser.GameObjects.GameObject;
   public itemText: Phaser.GameObjects.Text;
   public itemBack: Phaser.GameObjects.GameObject[];
   public player: Phaser.Physics.Arcade.Sprite;
@@ -276,7 +277,10 @@ export class Game extends Scene {
       })
       .setOrigin(0)
       .setDepth(96);
-
+    this.dashBar = this.add
+      .rectangle(32 * 1.5, 32 * 1.5 + 32 * 2, 0, 12, 0x000000)
+      .setOrigin(0)
+      .setDepth(95);
     this.itemBack = [
       this.add
         .rectangle(W - 32 * 10.5, 32, 32 * 10, (32 * 10) / PHI, 0xff1964)
@@ -507,8 +511,36 @@ export class Game extends Scene {
     // Although we've added a lot of code it should all be pretty readable.
 
     // Basic movement controls set velocity directly
+    const canDash =
+      this.time.now - this.playerTimes.dash > playerConst.restDuration;
     const isDashing =
+      this.player.body?.touching.down &&
       this.time.now - this.playerTimes.dash < playerConst.dashDuration;
+
+    if (isDashing) {
+      this.dashBar.alpha = 1;
+      // TODO cleanup, use tweens?
+      this.dashBar.width =
+        ((1 -
+          (this.time.now - this.playerTimes.dash) / playerConst.dashDuration) *
+          W) /
+        PHI /
+        2;
+    } else if (!canDash) {
+      this.dashBar.alpha = 1;
+      this.dashBar.width =
+        (2 *
+          (-0.5 +
+            (this.time.now - this.playerTimes.dash) /
+              playerConst.restDuration) *
+          W) /
+        PHI /
+        2;
+      if (this.dashBar.width < 0) this.dashBar.width = 0;
+    } else {
+      this.dashBar.alpha = 0;
+    }
+
     const horizSpeed = isDashing ? playerConst.dashHoriz : playerConst.horiz;
     if (this.cursors?.left.isDown) {
       // 160 px/sec
@@ -530,13 +562,12 @@ export class Game extends Scene {
       this.player.anims.play(this.cursors?.down.isDown ? "rightDodge" : "turn");
     }
 
-    // MESSSS!!
     if (
       this.cursors?.shift.isDown &&
-      (this.cursors?.left.isDown || this.cursors?.right.isDown)
+      (this.cursors?.left.isDown || this.cursors?.right.isDown) &&
+      canDash
     ) {
-      if (this.time.now - this.playerTimes.dash > playerConst.restDuration)
-        this.playerTimes.dash = this.time.now;
+      this.playerTimes.dash = this.time.now;
     }
 
     // Coyote Time: allow jumping even after falling off a platform
