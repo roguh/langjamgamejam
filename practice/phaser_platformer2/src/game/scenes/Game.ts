@@ -1,10 +1,25 @@
-import { Scene } from "phaser";
+import { Scene, Input } from "phaser";
 
 const DEV_MODE = true;
+
+const playerConst = {
+  horiz: 160,
+  dashHoriz: 400,
+  vert: 430,
+  dashActivation: 750, // milliseconds between button  mashes
+  dashDuration: 1000,
+};
 
 export class Game extends Scene {
   public platforms: Phaser.Physics.Arcade.StaticGroup;
   public player: Phaser.Physics.Arcade.Sprite;
+  public playerTimes = {
+    grounded: 0,
+    releaseLeft: 0,
+    releaseRight: 0,
+    dash: 0,
+  };
+  public coyoteTime: number = 200; // milliseconds
   public cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
 
   constructor() {
@@ -117,6 +132,21 @@ export class Game extends Scene {
       repeat: -1,
     });
     this.anims.create({
+      key: "leftDodge",
+      frames: this.anims.generateFrameNumbers("thedude", {
+        start: 11,
+        end: 12,
+      }),
+      frameRate: 14,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: "rightDodge",
+      frames: this.anims.generateFrameNumbers("thedude", { start: 9, end: 10 }),
+      frameRate: 14,
+      repeat: -1,
+    });
+    this.anims.create({
       key: "turn",
       frames: [{ key: "thedude", frame: 4 }],
       frameRate: 20,
@@ -128,19 +158,67 @@ export class Game extends Scene {
 
   update() {
     // Although we've added a lot of code it should all be pretty readable.
+
+    // Basic movement controls set velocity directly
+    const isDashing =
+      this.time.now - this.playerTimes.dash < playerConst.dashDuration;
+    const horizSpeed = isDashing ? playerConst.dashHoriz : playerConst.horiz;
     if (this.cursors?.left.isDown) {
       // 160 px/sec
-      this.player.setVelocityX(-160);
-      this.player.anims.play("left", true);
+      this.player.setVelocityX(-horizSpeed);
+      // TODO smaller hitbox
+      // TODO move slower, slower dash too
+      this.player.anims.play(
+        this.cursors?.down.isDown ? "leftDodge" : "left",
+        true,
+      );
     } else if (this.cursors?.right.isDown) {
-      this.player.setVelocityX(160);
-      this.player.anims.play("right", true);
+      this.player.setVelocityX(horizSpeed);
+      this.player.anims.play(
+        this.cursors?.down.isDown ? "rightDodge" : "right",
+        true,
+      );
     } else {
       this.player.setVelocityX(0);
       this.player.anims.play("turn");
     }
-    if (this.cursors?.up.isDown && this.player.body?.touching.down) {
-      this.player.setVelocityY(-330);
+
+    // MESSSS!!
+    if (
+      this.cursors?.shift.isDown &&
+      (this.cursors?.left.isDown || this.cursors?.right.isDown)
+    ) {
+      if (this.time.now - this.playerTimes.dash > 2 * playerConst.dashDuration)
+        this.playerTimes.dash = this.time.now;
+    }
+
+    // Coyote Time: allow jumping even after falling off a platform
+    if (
+      this.cursors?.up.isDown &&
+      (this.player.body?.touching.down ||
+        this.time.now - this.playerTimes.grounded < this.coyoteTime)
+    ) {
+      this.player.setVelocityY(-430);
+    }
+    if (this.player.body?.touching.down) {
+      this.playerTimes.grounded = this.time.now;
+    }
+
+    // Fast falling: less wasted time falling
+    if (
+      !this.player.body?.touching.down &&
+      this.player.body?.velocity.y &&
+      this.player.body?.velocity.y > 0
+    ) {
+      this.player.setGravityY(600);
+    } else {
+      this.player.setGravityY(300);
+    }
+    // Allow fine-grained jump height control by releasing up key early
+    if (this.cursors?.up && Input.Keyboard.JustUp(this.cursors?.up)) {
+      if ((this.player.body?.velocity.y || 0) < 0) {
+        this.player.setVelocityY(0);
+      }
     }
   }
 }
