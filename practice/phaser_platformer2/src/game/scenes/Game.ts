@@ -53,11 +53,14 @@ export class Game extends Scene {
   public dialogueText: Phaser.GameObjects.Text;
   public dialogueHow: Phaser.GameObjects.Text;
   public statusText: Phaser.GameObjects.Text;
+  public statusElements: (
+    | Phaser.GameObjects.GameObject
+    | Phaser.GameObjects.Text
+  )[] = [];
   public dashBar: Phaser.GameObjects.GameObject;
   public itemText: Phaser.GameObjects.Text;
   public itemBack: Phaser.GameObjects.GameObject[];
   public player: Phaser.Physics.Arcade.Sprite;
-  public mainSquirrel: Phaser.Physics.Arcade.Sprite;
   public squirrels: Phaser.Physics.Arcade.Group;
   public conversationalists: Record<string, Phaser.Physics.Arcade.Sprite>;
   public items: { text: string; obj: Phaser.GameObjects.GameObject }[] = [];
@@ -80,6 +83,8 @@ export class Game extends Scene {
       "The Tree is found deeper into the woods towards the bottom-right side of your screen :)",
     ];
     this.currentDialogue = INIT_DIALOGUE;
+    this.items = [];
+    this.conversationalists = {};
   }
 
   preload() {
@@ -107,9 +112,9 @@ export class Game extends Scene {
     // TODO other fuel source?
   }
 
-  create() {
-    // 512,384 is the center of the screen
-    this.add.image(512, 384, "background");
+  introText() {
+    const viewTime = DEV_MODE ? 0.01 : 1;
+    const transTime = DEV_MODE ? 1 : 4;
     const text = [
       this.add
         .text(W / 2, H / 2, "Axelloni: A narrative platformer.", {
@@ -136,9 +141,8 @@ export class Game extends Scene {
         .setDepth(100),
       this.add.rectangle(W / 2, H / 2, W, H, 0x000000).setDepth(99),
     ];
-    const viewTime = DEV_MODE ? 0.01 : 1;
-    const transTime = DEV_MODE ? 1 : 4;
-    text.forEach((txt) =>
+    text.forEach((txt) => {
+      txt.setScrollFactor(0);
       this.time.addEvent({
         delay: viewTime * 1000,
         callback: () => {
@@ -159,11 +163,11 @@ export class Game extends Scene {
             repeat: 0,
           });
         },
-      }),
-    );
+      });
+    });
+  }
 
-    this.physics.world.setBounds(-W * 2, 0, W * 4, H * 3);
-
+  setupIntroLevel() {
     this.platforms = this.physics.add.staticGroup();
     // Refresh required after scaling
     this.platforms.create(400, 568, "ground").setScale(2).refreshBody();
@@ -173,16 +177,43 @@ export class Game extends Scene {
     this.passThru = this.physics.add.staticGroup();
     this.passThru.create(800, 568, "ground").setOrigin(0);
 
-    this.camera = this.cameras.main;
-
-    // The Dude abides
-    this.player = this.physics.add
-      .sprite(100, 450, "thedude")
+    // Squirrels
+    this.squirrels = this.physics.add.group();
+    this.squirrels
+      .create(400, 350, "squirrel")
+      .setBounce(0.2)
+      .setCollideWorldBounds(true)
+      .setScale(1.5);
+    this.squirrels
+      .create(100, 200, "squirrel")
+      .setBounce(0.2)
+      .setCollideWorldBounds(true)
+      .setScale(1.5);
+    this.squirrels
+      .create(150, 200, "squirrel")
+      .setBounce(0.2)
+      .setCollideWorldBounds(true)
+      .setScale(1.5);
+    const mainSquirrel = this.squirrels
+      .create(600, 350, "squirrel")
       .setBounce(0.2)
       .setCollideWorldBounds(true)
       .setScale(1.5)
       .refreshBody();
-    /// This allows you to define a single animation once and apply it to as many Game Objects as you require.
+    mainSquirrel.flipX = true;
+
+    this.conversationalists.SquirrelPriest = mainSquirrel;
+    this.squirrels.children.iterate((obj) => {
+      if (obj === mainSquirrel) return null;
+      this.items.push({
+        obj,
+        text: `A squirrel sits watching another squirrel attentively.`,
+      });
+      return null;
+    });
+  }
+
+  setupAnims() {
     this.anims.create({
       key: "left",
       frames: this.anims.generateFrameNumbers("thedude", { start: 0, end: 3 }),
@@ -216,30 +247,6 @@ export class Game extends Scene {
       frames: [{ key: "thedude", frame: 4 }],
       frameRate: 20,
     });
-
-    this.squirrels = this.physics.add.group();
-    this.squirrels
-      .create(400, 350, "squirrel")
-      .setBounce(0.2)
-      .setCollideWorldBounds(true)
-      .setScale(1.5);
-    this.squirrels
-      .create(100, 200, "squirrel")
-      .setBounce(0.2)
-      .setCollideWorldBounds(true)
-      .setScale(1.5);
-    this.squirrels
-      .create(150, 200, "squirrel")
-      .setBounce(0.2)
-      .setCollideWorldBounds(true)
-      .setScale(1.5);
-    this.mainSquirrel = this.squirrels
-      .create(600, 350, "squirrel")
-      .setBounce(0.2)
-      .setCollideWorldBounds(true)
-      .setScale(1.5)
-      .refreshBody();
-    this.mainSquirrel.flipX = true;
     this.anims.create({
       key: "squirrel-idle",
       frames: this.anims.generateFrameNumbers("squirrel", {
@@ -249,61 +256,41 @@ export class Game extends Scene {
       frameRate: 5,
       repeat: -1,
     });
+  }
 
-    this.bombs = this.physics.add.group();
-
-    this.cursors = this.input.keyboard?.createCursorKeys();
-    this.physics.add.collider(this.player, this.platforms);
-    this.physics.add.collider(this.bombs, this.platforms);
-    this.physics.add.collider(this.squirrels, this.platforms);
-    this.physics.add.collider(this.player, this.bombs, this.hitBomb);
-
-    this.conversationalists = {
-      SquirrelYarn: this.mainSquirrel,
-    };
-    this.items = [];
-    this.squirrels.children.iterate((obj) => {
-      if (obj === this.mainSquirrel) return null;
-      this.items.push({
-        obj,
-        text: `A squirrel sits watching another squirrel attentively.`,
-      });
-      return null;
-    });
-
-    this.bombs
-      .create(400, 300, "bomb")
-      .setBounce(1)
-      .setVelocity(Math.Between(-200, 200), 20);
-
+  setupUI() {
     this.statusText = this.add
       .text(32 * 1.5, 32 * 1.5, "Health: +++++\nFuel: 0", {
         fontSize: "22px",
         color: "#000",
-        stroke: "#333",
-        strokeThickness: 1,
+        stroke: "#444",
+        strokeThickness: 2,
       })
       .setOrigin(0)
       .setDepth(96);
     this.dashBar = this.add
-      .rectangle(32 * 1.5, 32 * 1.5 + 32 * 2, 0, 12, 0x000000)
+      .rectangle(32 * 1.5, 32 * 1.5 + 32 * 2, 0, 12, 0x101010)
       .setOrigin(0)
       .setDepth(95);
+    this.statusElements = [this.statusText, this.dashBar];
+    this.statusElements.forEach((e) => (e || e?.body).setScrollFactor(0));
     this.itemBack = [
       this.add
         .rectangle(W - 32 * 10.5, 32, 32 * 10, (32 * 10) / PHI, 0xff1964)
         .setOrigin(0)
-        .setDepth(95),
+        .setDepth(95)
+        .setScrollFactor(0),
     ];
     this.itemText = this.add
       .text(W - 32 * 10, 32 * 1.5, "", {
         fontSize: "22px",
         color: "#000",
-        stroke: "#333",
+        stroke: "#999",
         strokeThickness: 1,
       })
       .setOrigin(0)
-      .setDepth(96);
+      .setDepth(96)
+      .setScrollFactor(0);
 
     const dialogueW = W;
     const dialogueH = (400 * PHI) / 4;
@@ -398,6 +385,83 @@ export class Game extends Scene {
       ...this.dialogueChoices,
       ...dialogueChoiceBack,
     ];
+    this.dialogueElements.forEach((e) => (e || e?.body).setScrollFactor(0));
+    this.dialogueChoiceElements.forEach((e) =>
+      (e || e?.body).setScrollFactor(0),
+    );
+  }
+
+  setupLowerLevel() {
+    this.add.rectangle(-W * 2, H * 2, W * 4, H, 0x103020).setOrigin(0);
+
+    this.squirrels
+      .create(W / 3, H * 2.5, "squirrel")
+      .setBounce(0.2)
+      .setCollideWorldBounds(true)
+      .setScale(2)
+      .refreshBody();
+    this.squirrels
+      .create(W / 4, H * 2.5, "squirrel")
+      .setBounce(0.2)
+      .setCollideWorldBounds(true)
+      .setScale(2)
+      .refreshBody();
+    const squirrel2 = this.squirrels
+      .create(W / 2, H * 2.5, "squirrel")
+      .setBounce(0.2)
+      .setCollideWorldBounds(true)
+      .setScale(4)
+      .refreshBody();
+    squirrel2.flipX = true;
+
+    this.conversationalists.SquirrelUnderdog = squirrel2;
+    this.squirrels.children.iterate((obj) => {
+      if (obj === squirrel2 || this.items.map(({ obj }) => obj).includes(obj))
+        return null;
+      this.items.push({
+        obj,
+        text: `A squirrel sits watching another squirrel attentively.`,
+      });
+      return null;
+    });
+  }
+
+  create() {
+    // 512,384 is the center of the screen
+    this.add.tileSprite(512, 384, W * 4, H, "background");
+
+    this.introText();
+    this.physics.world.setBounds(-W * 2, 0, W * 4, H * 3);
+
+    this.setupIntroLevel();
+    this.setupLowerLevel();
+
+    this.camera = this.cameras.main;
+
+    // The Dude abides
+    this.player = this.physics.add
+      .sprite(100, 450, "thedude")
+      .setBounce(0.2)
+      .setCollideWorldBounds(true)
+      .setScale(1.5)
+      .refreshBody();
+
+    this.setupAnims();
+
+    this.bombs = this.physics.add.group();
+
+    this.cursors = this.input.keyboard?.createCursorKeys();
+    this.physics.add.collider(this.player, this.platforms);
+    this.physics.add.collider(this.bombs, this.platforms);
+    this.physics.add.collider(this.squirrels, this.platforms);
+    this.physics.add.collider(this.player, this.bombs, this.hitBomb);
+
+    this.bombs
+      .create(400, 300, "bomb")
+      .setBounce(1)
+      .setVelocity(Math.Between(-200, 200), 20);
+
+    this.setupUI();
   }
 
   continueDialogue(): string | null {
@@ -432,14 +496,14 @@ export class Game extends Scene {
     return res;
   }
 
-  updateDialogue(_yarnNodeName: string, obj: Phaser.GameObjects.GameObject) {
+  updateDialogue(yarnNodeName: string, obj: Phaser.GameObjects.GameObject) {
     let next;
     this.dialogueElements.map((e) => (e.alpha = 1));
     if (this.dialogueState !== "WaitingOnOptionSelection") {
       this.dialogueChoiceElements.forEach((e) => (e.alpha = 0));
     }
     this.dialogueBox.alpha = 0.65;
-    const name = "Squirrel Priest";
+    const name = yarnNodeName;
 
     if (this.cursors?.space && Input.Keyboard.JustUp(this.cursors?.space)) {
       if ((next = this.continueDialogue())) this.currentDialogue = next;
@@ -474,8 +538,12 @@ export class Game extends Scene {
     this.playerTimes.dialogueStart = this.time.now;
   }
 
-  updateInventory(desc: string, obj) {
-    this.itemBack.forEach((e) => (e.alpha = 0.65));
+  updateInventory(desc: string, obj: Phaser.GameObjects.GameObject) {
+    const ox = obj.body?.position.x || 0;
+    const oy = (obj.body?.position.y || 0) - 32;
+    this.itemBack.forEach((e) => {
+      e.alpha = 0.65;
+    });
     this.itemText.alpha = 1;
     this.itemText.setText(wrap(desc, "A squirrel sites watc".length));
   }
@@ -519,6 +587,14 @@ export class Game extends Scene {
     // Although we've added a lot of code it should all be pretty readable.
 
     this.camera.centerOnX(this.player.x);
+    if (this.player.y % H) {
+      this.camera.centerOnY(this.player.y);
+    }
+
+    if (this.player.y > H * 2) {
+      this.statusText.setColor("#ff1964");
+      this.dashBar.fillColor = 0xff1964;
+    }
 
     // Basic movement controls set velocity directly
     const canDash =
