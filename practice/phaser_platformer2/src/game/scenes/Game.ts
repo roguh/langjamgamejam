@@ -33,10 +33,12 @@ type DialogueExecutionState =
   | "Running";
 
 export class Game extends Scene {
+  public camera: Phaser.Cameras.Scene2D.Camera;
   public currentDialogue: string;
   public dialogueState: DialogueExecutionState;
   public dialogueVM: string[];
   public platforms: Phaser.Physics.Arcade.StaticGroup;
+  public passThru: Phaser.Physics.Arcade.StaticGroup;
   public bombs: Phaser.Physics.Arcade.Group;
   public dialogueElements: (
     | Phaser.GameObjects.GameObject
@@ -160,12 +162,18 @@ export class Game extends Scene {
       }),
     );
 
+    this.physics.world.setBounds(-W * 2, 0, W * 4, H * 3);
+
     this.platforms = this.physics.add.staticGroup();
     // Refresh required after scaling
     this.platforms.create(400, 568, "ground").setScale(2).refreshBody();
     this.platforms.create(600, 400, "ground");
     this.platforms.create(50, 250, "ground");
     this.platforms.create(750, 220, "ground");
+    this.passThru = this.physics.add.staticGroup();
+    this.passThru.create(800, 568, "ground").setOrigin(0);
+
+    this.camera = this.cameras.main;
 
     // The Dude abides
     this.player = this.physics.add
@@ -509,6 +517,8 @@ export class Game extends Scene {
     }
 
     // Although we've added a lot of code it should all be pretty readable.
+
+    this.camera.centerOnX(this.player.x);
 
     // Basic movement controls set velocity directly
     const canDash =
