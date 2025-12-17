@@ -38,6 +38,18 @@ k.loadSpriteAtlas("sprites/map.png", {
   },
 });
 
+const [SQW, SQH] = [80, 48];
+k.loadSpriteAtlas("sprites/AzdnerSquirrelIdle.png", {
+  squirrel: {
+    x: 0,
+    y: 0,
+    width: SQW * 11,
+    height: SQH,
+    sliceX: 11,
+    anims: { idle: { from: 0, to: 10 } },
+  },
+});
+
 k.loadSpriteAtlas("sprites/sama.png", {
   sama: {
     x: 0,
@@ -137,6 +149,15 @@ const txt = k.add([
   },
 ]);
 
+const squirrel = k.add([
+  "mover",
+  k.sprite("squirrel"),
+  k.area({ shape: new k.Rect(k.vec2(0, SQH / 2), SQW * 0.5, SQW * 0.5) }),
+  k.anchor("center"),
+  k.body(),
+  k.pos(240, 300),
+]);
+
 const player = k.add([
   "mover",
   "player",
@@ -147,7 +168,7 @@ const player = k.add([
   k.body(),
   k.pos(),
   {
-    initPos: k.vec2(100, 100),
+    initPos: k.vec2(100, 700),
     speed: 350,
     rollSpeed: 300,
     runSpeed: 450,
@@ -189,17 +210,12 @@ const player = k.add([
 k.onLoad(() => {
   map.use(k.scale(0.45));
   player.init();
+  squirrel.play("idle");
+  k.debug.log(squirrel.pos);
   k.setCamScale(1.5);
   loadGame(player);
   // k.debug.inspect = true;
-  k.debug.log("beeeeeeeeeeeeeeep");
   k.debug.showLog = true;
-  k.debug.log("booooooooooop");
-  k.debug.log("booooooooooop");
-  k.debug.log("booooooooooop");
-  k.debug.log("booooooooooop");
-  k.debug.log("booooooooooop");
-  k.debug.log({ 1: 2, a: [[[[[[[[[1]]]]]]]]] });
 });
 
 // TODO: add action buffer for attacks and jumps
@@ -207,7 +223,10 @@ k.onLoad(() => {
 const actions = {
   lastDown: 0,
   lastUp: 0,
-  reset: () => player.moveTo(player.initPos),
+  reset: () => {
+    player.vel.y = 0;
+    player.moveTo(player.initPos);
+  },
   up: () => {
     console.debug("action.up");
     // Allow coyote time late jumps
@@ -345,5 +364,6 @@ k.onUpdate(() => {
   if (k.time() - saveTime() > 1) {
     saveTime(k.time());
     fastSaveGame(player);
+    k.debug.log(squirrel.pos);
   }
 });

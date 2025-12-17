@@ -1,1 +1,1 @@
-cp ../../tiles/*.png public/sprites/
+cp ../../assets/sprites/*.png public/sprites/
