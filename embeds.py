@@ -6,18 +6,21 @@ import os.path
 
 
 def parse(fname: str) -> str:
+    print("[----] Reading", fname)
     with open(fname) as f:
         contents = f.read()
     return json.dumps(contents.replace("/", "/"))
 
 
 def generate(base_dir: str, extension: str, output: str):
+    # TODO guarantee same order on any machine
+    fnames = sorted(glob.glob(base_dir + "/*/*" + extension))
     contents = (
         "pub const assets = ["
         + "\n  ".join(
             [
                 f"#({json.dumps(n.replace(base_dir, ''))}, {parse(n)}),"
-                for n in glob.glob(base_dir + "/*/*" + extension)
+                for n in fnames
             ]
         )
         + "\n]"
@@ -25,7 +28,7 @@ def generate(base_dir: str, extension: str, output: str):
     if os.path.isfile(output):
         with open(output) as f:
             if f.read() == contents:
-                print("skipping", output)
+                print("[----] Skipping", output)
                 return
     with open(output, "w") as f:
         f.write(contents)
