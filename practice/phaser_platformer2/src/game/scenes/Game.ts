@@ -1,8 +1,9 @@
 import { Math, Scene, Input } from "phaser";
+import { wrap } from "../utils";
 
 const [W, H] = [1024, 768];
 
-const DEV_MODE = true;
+const DEV_MODE = false;
 const PHI = 0.5 + 5 ** 0.5 * 0.5;
 // const MAX_DIALOGUE = ".......................".length; // for width 300*PHI
 // const MAX_DIALOGUE = "................................".length; // for width 400*PHI
@@ -12,14 +13,17 @@ const EMPTY_DIALOGUE = null;
 const INIT_DIALOGUE = "";
 
 const playerConst = {
+  // Speed in px/sec
   horiz: 160,
   dashHoriz: 400,
   vert: 430,
-  dashActivation: 750, // milliseconds between button  mashes
+  // Durations in milliseconds
   dashDuration: 1000,
-  dialogueDistance: 150,
-  itemDistance: 150,
-  ////  dialogueDistance: 700,
+  restDuration: 2000,
+  // Distance in px
+  dialogueDistance: 120,
+  ////  dialogueDistance: 700, // useful for testing
+  itemDistance: 95,
 };
 
 type DialogueExecutionState =
@@ -27,28 +31,6 @@ type DialogueExecutionState =
   | "WaitingOnOptionSelection"
   | "WaitingOnContinue"
   | "Running";
-
-const wrap = (str: string, maxLen: number): string[] => {
-  // implement wrap logic here
-  const words = str.split(" ");
-  const lines = [];
-  let currentLine = "";
-
-  for (const word of words) {
-    if (currentLine.length + word.length + 1 > maxLen) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine += (currentLine.length > 0 ? " " : "") + word;
-    }
-  }
-
-  if (currentLine.length > 0) {
-    lines.push(currentLine);
-  }
-
-  return lines;
-};
 
 export class Game extends Scene {
   public currentDialogue: string;
@@ -72,10 +54,10 @@ export class Game extends Scene {
   public itemText: Phaser.GameObjects.Text;
   public itemBack: Phaser.GameObjects.GameObject[];
   public player: Phaser.Physics.Arcade.Sprite;
-  public squirrel: Phaser.Physics.Arcade.Sprite;
+  public mainSquirrel: Phaser.Physics.Arcade.Sprite;
   public squirrels: Phaser.Physics.Arcade.Group;
   public conversationalists: Record<string, Phaser.Physics.Arcade.Sprite>;
-  public items: Record<string, Phaser.GameObjects.GameObject>;
+  public items: { text: string; obj: Phaser.GameObjects.GameObject }[] = [];
   public playerTimes = {
     grounded: 0,
     releaseLeft: 0,
@@ -113,9 +95,13 @@ export class Game extends Scene {
       frameWidth: 80,
       frameHeight: 48,
     });
+    // TODO the ship
     // TODO Vera Orion
     // TODO tree
     // TODO drone
+    // TODO dead drone
+    // TODO chest
+    // TODO other fuel source?
   }
 
   create() {
@@ -126,9 +112,7 @@ export class Game extends Scene {
         .text(W / 2, H / 2, "Axelloni: A narrative platformer.", {
           fontFamily: "Arial Black",
           fontSize: 38,
-          color: "#ffffff",
-          stroke: "#000000",
-          strokeThickness: 8,
+          color: "#ff1964",
           align: "center",
         })
         .setOrigin(0.5)
@@ -141,15 +125,13 @@ export class Game extends Scene {
           {
             fontFamily: "Arial Black",
             fontSize: 27,
-            color: "#ffffff",
-            stroke: "#000000",
-            strokeThickness: 3,
+            color: "#ff1964",
             align: "center",
           },
         )
         .setOrigin(0.5)
         .setDepth(100),
-      this.add.rectangle(W / 2, H / 2, W, H, 0xff1964).setDepth(99),
+      this.add.rectangle(W / 2, H / 2, W, H, 0x000000).setDepth(99),
     ];
     const viewTime = DEV_MODE ? 0.01 : 1;
     const transTime = DEV_MODE ? 1 : 4;
@@ -159,7 +141,7 @@ export class Game extends Scene {
         callback: () => {
           this.tweens.add({
             targets: txt,
-            y: -H / 2,
+            y: -H,
             ease: "EaseIn",
             duration: transTime * 1000,
             yoyo: false,
@@ -227,12 +209,6 @@ export class Game extends Scene {
     });
 
     this.squirrels = this.physics.add.group();
-    this.squirrel = this.squirrels
-      .create(600, 350, "squirrel")
-      .setBounce(0.2)
-      .setCollideWorldBounds(true)
-      .setScale(1.5)
-      .refreshBody();
     this.squirrels
       .create(400, 350, "squirrel")
       .setBounce(0.2)
@@ -248,7 +224,13 @@ export class Game extends Scene {
       .setBounce(0.2)
       .setCollideWorldBounds(true)
       .setScale(1.5);
-    this.squirrel.flipX = true;
+    this.mainSquirrel = this.squirrels
+      .create(600, 350, "squirrel")
+      .setBounce(0.2)
+      .setCollideWorldBounds(true)
+      .setScale(1.5)
+      .refreshBody();
+    this.mainSquirrel.flipX = true;
     this.anims.create({
       key: "squirrel-idle",
       frames: this.anims.generateFrameNumbers("squirrel", {
@@ -268,12 +250,16 @@ export class Game extends Scene {
     this.physics.add.collider(this.player, this.bombs, this.hitBomb);
 
     this.conversationalists = {
-      SquirrelYarn: this.squirrel,
+      SquirrelYarn: this.mainSquirrel,
     };
-    this.items = {};
-    this.squirrels.children.iterate((child) => {
-      this.items[`A squirrel sits watching another squirrel attentively.`] =
-        child;
+    this.items = [];
+    this.squirrels.children.iterate((obj) => {
+      if (obj === this.mainSquirrel) return null;
+      this.items.push({
+        obj,
+        text: `A squirrel sits watching another squirrel attentively.`,
+      });
+      return null;
     });
 
     this.bombs
@@ -503,17 +489,17 @@ export class Game extends Scene {
     } else {
       this.closeDialogue();
     }
-    let nearbyItems = Object.entries(this.items).filter(
-      ([key, item]) =>
+    let nearbyItems = this.items.filter(
+      ({ obj }) =>
         Math.Distance.Between(
           this.player.x,
           this.player.y,
-          item.body?.position.x ?? -Infinity,
-          item.body?.position.y ?? -Infinity,
+          obj.body?.position.x ?? -Infinity,
+          obj.body?.position.y ?? -Infinity,
         ) < playerConst.itemDistance,
     );
     if (nearbyItems.length > 0) {
-      this.updateInventory(...nearbyItems[0]);
+      this.updateInventory(nearbyItems[0].text, nearbyItems[0].obj);
     } else {
       this.closeInventory();
     }
@@ -549,7 +535,7 @@ export class Game extends Scene {
       this.cursors?.shift.isDown &&
       (this.cursors?.left.isDown || this.cursors?.right.isDown)
     ) {
-      if (this.time.now - this.playerTimes.dash > 2 * playerConst.dashDuration)
+      if (this.time.now - this.playerTimes.dash > playerConst.restDuration)
         this.playerTimes.dash = this.time.now;
     }
 

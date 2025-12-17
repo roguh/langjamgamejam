@@ -170,6 +170,11 @@ Make it easy to compile Yarn scripts to other game frameworks as well.
 Substantial tests.
 
 ```
+# arch linux
+sudo pacman -Syu rebar3
+trizen -Syu aur/gleam-bin
+sudo ufw allow 9999
+
 # install gleam
 gleam new project-name
 gleam add lustre atto gleam_json
@@ -210,3 +215,14 @@ Ready to continue?
   Indeed
   <<jump>>
 ===
+
+# Day 5: Rewrite in Phaser
+
+```
+npx @phaserjs/create-game@latest  # pick vite with typescript
+```
+
+phaser extension
+console and typescript checker ESSENTIAL for viewing errors
+FPS extension is cool
+
