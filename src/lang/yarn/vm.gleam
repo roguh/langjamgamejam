@@ -111,16 +111,16 @@ pub type VMString {
   Literal(String)
 }
 
-fn top(vm: VM) {
+pub fn top(_vm: VM) {
   todo
 }
 
 /// Pick an option
 /// It's an error to pick an option that is out-of-bounds or to pick an option when not in the select-option state
-pub fn select_option(vm: VM, number: Int) {
+pub fn select_option(_vm: VM, _number: Int) {
   todo
 }
 
-pub fn jump_to_node(vm: VM, node_id: Int) {
+pub fn jump_to_node(_vm: VM, _node_id: Int) {
   todo
 }

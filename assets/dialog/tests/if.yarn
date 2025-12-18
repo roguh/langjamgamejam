@@ -1,0 +1,19 @@
+title: Test
+---
+<<set $gold_amount to 5>>
+Player: I'd like to buy a pie!
+
+<<if $gold_amount < 10>>
+    Baker: Well, you can't afford one!
+<<elseif $gold_amount < 15>>
+    Baker: You can almost afford one!
+<<else>>
+    Baker: You can afford a pie!
+<<endif>>
+
+<<if $gold_amount + 1 > 11 + 2>>
+    Baker: 1
+<<elseif $gold_amount > 15>>
+    Baker: 2
+<<endif>>
+===

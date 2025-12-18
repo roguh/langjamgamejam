@@ -1,4 +1,5 @@
 import gleam/bool
+import gleam/float
 import gleam/int
 import gleam/list
 import gleam/option.{type Option}
@@ -50,12 +51,12 @@ pub type YarnCommand {
   Stop
   // Declares are evaluated every time they are used, more like a lambda
   // "Smart Variables"
-  Declare(String, YarnExpr)
+  Decl(String, YarnExpr)
   Set(String, YarnExpr)
-  If(YarnExpr, YarnBody, Option(YarnBody))
-  Once(Option(YarnExpr), YarnBody, Option(YarnBody))
+  If(YarnExpr, List(YarnBody), Option(List(YarnBody)))
+  Once(Option(YarnExpr), List(YarnBody), Option(List(YarnBody)))
   DeclEnum(String, List(String))
-  ArbitraryCommand(String, List(YarnExpr))
+  Arbitrary(String, List(YarnExpr))
 }
 
 pub type YarnMarkup {
@@ -85,17 +86,21 @@ pub type YarnLineGroupItem {
   )
 }
 
-pub type YarnBody {
-  // See the pretty-printer and parser for syntax
-  Line(content: List(LineElement), name: Option(String), tags: List(String))
-  Choice(
+pub type YarnChoiceItem {
+  ChoiceItem(
     content: List(LineElement),
     next: List(YarnBody),
     tags: List(String),
     condition: Option(YarnExpr),
   )
+}
+
+pub type YarnBody {
+  // See the pretty-printer and parser for syntax
+  Line(content: List(LineElement), name: Option(String), tags: List(String))
+  Choice(List(YarnChoiceItem))
   LineGroup(List(YarnLineGroupItem))
-  Command(YarnCommand)
+  Cmd(YarnCommand)
 }
 
 pub type YarnNode {
@@ -133,7 +138,7 @@ pub fn error_in(ar: YarnArtifact, ix: Int, default: a, error: a) {
 pub fn pretty_val(val: YarnVal) -> String {
   case val {
     YString(s) -> "\"" <> s <> "\""
-    YNumber(s, _n) -> s
+    YNumber(_s, n) -> float.to_string(n)
     YBool(b) -> bool.to_string(b)
     YEnum(name, val) -> name <> "." <> val
   }
@@ -162,18 +167,20 @@ pub fn pretty_cmd(c: YarnCommand, depth: Int) -> String {
     Detour(label) -> "detour " <> label
     Return -> "return"
     Stop -> "stop"
-    Declare(name, expr) -> "declare " <> name <> " = " <> pretty_expr(expr)
+    Decl(name, expr) -> "declare " <> name <> " = " <> pretty_expr(expr)
     Set(name, expr) -> "set " <> name <> " to " <> pretty_expr(expr)
     If(cond, then_, else_) ->
       "if "
       <> pretty_expr(cond)
       <> ">>\n"
-      <> pretty_body(then_, depth + 1)
-      // TODO handle <<elseif cond>> syntax
+      <> then_ |> pretty_lbody(depth + 1)
       <> option.unwrap(
         else_
           |> option.map(fn(else_body) {
-            "\n" <> prefix <> "<<else>>\n" <> pretty_body(else_body, depth + 1)
+            "\n"
+            <> prefix
+            <> "<<else>>\n"
+            <> else_body |> pretty_lbody(depth + 1)
           }),
         "",
       )
@@ -182,11 +189,14 @@ pub fn pretty_cmd(c: YarnCommand, depth: Int) -> String {
       "once"
       <> option.unwrap(cond |> option.map(fn(e) { " " <> pretty_expr(e) }), "")
       <> ">>\n"
-      <> pretty_body(body, depth + 1)
+      <> body |> pretty_lbody(depth + 1)
       <> option.unwrap(
         else_
           |> option.map(fn(else_body) {
-            "\n" <> prefix <> "<<else>>\n" <> pretty_body(else_body, depth + 1)
+            "\n"
+            <> prefix
+            <> "<<else>>\n"
+            <> else_body |> pretty_lbody(depth + 1)
           }),
         "",
       )
@@ -199,7 +209,7 @@ pub fn pretty_cmd(c: YarnCommand, depth: Int) -> String {
       |> list.map(fn(v) { prefix2 <> "<<case " <> v <> ">>" })
       |> string.join("\n")
       <> "\n<<endenum"
-    ArbitraryCommand(command, args) ->
+    Arbitrary(command, args) ->
       command
       <> " "
       <> args
@@ -250,18 +260,23 @@ pub fn pretty_body(b: YarnBody, depth: Int) -> String {
       <> pretty_tags(tags)
       <> "  // line "
       <> int.to_string(depth)
-    Choice(content, next, tags, cond) ->
-      "-> "
-      <> pretty_line(content)
-      <> option.unwrap(
-        cond |> option.map(fn(c) { "<<if " <> pretty_expr(c) <> ">>" }),
-        "",
-      )
-      <> pretty_tags(tags)
-      <> "  // choice "
-      <> int.to_string(depth)
-      <> next |> list.map(pretty_body(_, depth + 1)) |> string.join("\n  ")
-    Command(cmd) -> pretty_cmd(cmd, depth)
+    Choice(items) ->
+      items
+      |> list.index_map(fn(c, ix) {
+        "-> "
+        <> pretty_line(c.content)
+        <> option.unwrap(
+          c.condition |> option.map(fn(c) { "<<if " <> pretty_expr(c) <> ">>" }),
+          "",
+        )
+        <> pretty_tags(c.tags)
+        <> "  // choice #"
+        <> int.to_string(ix)
+        <> ", "
+        <> int.to_string(depth)
+        <> c.next |> pretty_lbody(depth + 1)
+      })
+      |> string.join("\n  ")
     LineGroup(items) ->
       items
       |> list.map(fn(g) {
@@ -276,7 +291,14 @@ pub fn pretty_body(b: YarnBody, depth: Int) -> String {
         <> int.to_string(depth)
       })
       |> string.join("\n  ")
+    Cmd(cmd) -> pretty_cmd(cmd, depth)
   }
+}
+
+fn pretty_lbody(items: List(YarnBody), depth: Int) -> String {
+  items
+  |> list.map(pretty_body(_, depth))
+  |> string.join("\n")
 }
 
 pub fn pretty_node(n: YarnNode) -> String {
@@ -284,7 +306,7 @@ pub fn pretty_node(n: YarnNode) -> String {
   |> list.map(fn(kv) { kv.0 <> ": " <> kv.1 })
   |> string.join("\n")
   <> "\n---\n"
-  <> n.body |> list.map(pretty_body(_, 0)) |> string.join("\n")
+  <> n.body |> pretty_lbody(0)
   <> "\n===\n"
 }
 

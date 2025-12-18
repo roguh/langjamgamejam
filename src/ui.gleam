@@ -20,9 +20,9 @@ pub fn i(content: String) {
   html.p([y("font-style", "italic")], [html.text(content)])
 }
 
-pub fn code(content: String, color: String) {
+pub fn code(content: String) {
   html.pre([], [
-    html.code([y("color", color)], [html.text(content)]),
+    html.code([], [html.text(content)]),
   ])
 }
 
@@ -30,18 +30,17 @@ pub fn view(yarn_artifact: YarnArtifact) -> Element(a) {
   case yarn_artifact {
     Ok(content) ->
       html.div([], [
-        i("Succesfully converted to:"),
-        code(ast.pretty(content), "#fff"),
+        code(ast.pretty(content)),
       ])
     Error(error) ->
-      html.div([], [
+      html.div([y("background-color", "red")], [
         i(
           "Error found at line "
           <> error.line |> int.to_string
           <> ":"
           <> error.col |> int.to_string,
         ),
-        code(error.error, "red"),
+        code(error.error),
       ])
   }
 }
@@ -68,6 +67,9 @@ pub fn editor(source: String, artifact: YarnArtifact, edit_handler) {
                 y("margin", "0"),
                 y("padding", "0 2px"),
                 y("padding-top", "0.4px"),
+                y("text-align", "right"),
+                // No light mode
+                y("color", "white"),
                 y(
                   "background-color",
                   ast.error_in(artifact, ix + 1, "black", "darkred"),

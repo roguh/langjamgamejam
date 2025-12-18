@@ -1,3 +1,4 @@
+import gleam/dict
 import lustre
 import lustre/attribute
 import lustre/element.{type Element}
@@ -8,14 +9,14 @@ import lustre/event
 import gleam/int
 import gleam/list
 import gleam/option.{unwrap}
+import gleam/string
 
 import lang/yarn/assets
 import lang/yarn/ast
 import lang/yarn/generate
+import lang/yarn/interpreter
 import lang/yarn/parse
 import ui.{i, p, y}
-
-const arena_id = "___annie_arena___"
 
 type Model {
   Model(
@@ -59,22 +60,26 @@ fn update(model: Model, event: Event) -> Model {
 
 fn view(model: Model) -> Element(Event) {
   let css_link = "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
-  let code = case model.comp {
-    Ok(content) -> generate.generate(content, arena_id)
-    Error(_error) -> ""
+  let graph_view = case model.comp {
+    Ok(content) -> generate.generate(content)
+    Error(_error) -> i("Check the Yarn code for errors")
   }
-  let err = case model.comp {
-    Ok(_) -> ""
-    Error(_error) -> "check your code for an error"
+  let vm = interpreter.compile(model.source)
+  let instr_view = case vm {
+    Ok(s) ->
+      s.nodes
+      |> dict.to_list
+      |> list.map(fn(kv) {
+        "Node: "
+        <> kv.0
+        <> "\n"
+        <> kv.1 |> list.map(interpreter.print_instr) |> string.join("\n")
+      })
+      |> string.join("\n\n")
+      |> ui.code()
+    _ -> html.text("")
   }
-  // Use a keyed div to insert a new script element every time the user modifies the source code
-  let script =
-    keyed.div([], [
-      #(
-        int.to_string(model.iteration),
-        html.script([attribute.type_("text/javascript")], code),
-      ),
-    ])
+
   let gen =
     list.map(assets.names(), fn(n: String) -> #(String, Element(Event)) {
       #(
@@ -104,20 +109,15 @@ fn view(model: Model) -> Element(Event) {
         attribute.href(css_link),
       ]),
       game_buttons,
-      html.h1([], [html.text(model.name)]),
-      i(err),
-      html.div(
-        [
-          attribute.id(arena_id),
-        ],
-        [],
-      ),
-      p(
-        "It appears you've found a super fun code editor for the game shown above!",
-      ),
+      html.h2([], [html.text(model.name)]),
+      graph_view,
+      html.h3([], [
+        html.text("Editor"),
+      ]),
+      p("Change this Yarn script and observe new behavior!"),
       ui.editor(model.source, model.comp, UserInput),
+      instr_view,
       ui.view(model.comp),
-      script,
       html.figure([], [
         html.img([
           attribute.src("https://cdn2.thecatapi.com/images/b7k.jpg"),
@@ -135,7 +135,7 @@ fn view(model: Model) -> Element(Event) {
 }
 
 fn init(_args) -> Model {
-  let t = "/tests/choices.yarn"
+  let t = "/tests/if.yarn"
   let foxnews = ["She is", "He is", "They are"]
   let cat_is = case list.sample(foxnews, 1) {
     [n] -> n
