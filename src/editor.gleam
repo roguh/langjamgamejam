@@ -7,6 +7,7 @@ import lustre/event
 
 import gleam/list
 import gleam/option
+import gleam/result
 
 import lang/yarn/assets
 import lang/yarn/ast
@@ -88,7 +89,6 @@ fn view(model: Model) -> Element(Event) {
             y("padding", "0.4em"),
             y("margin-right", "1em"),
             y("margin-bottom", "0.5em"),
-            y("background-color", "darkred"),
             y("border-color", "white"),
             y("border-radius", "0"),
             event.on_click(Load(n)),
@@ -131,7 +131,13 @@ fn view(model: Model) -> Element(Event) {
       html.hr([y("margin", "0.2em 0")]),
       html.hr([y("margin", "0.1em 0")]),
       html.hr([y("margin", "0.1em 0")]),
-      model.vm |> chat.view(YarnContinue, YarnChoice, YarnNode),
+      case result.is_ok(model.comp) {
+        True -> model.vm |> chat.view(YarnContinue, YarnChoice, YarnNode)
+        False ->
+          html.p([y("background-color", "darkred"), y("padding", "0.5em")], [
+            html.text("Yarn error, story unable to compile!"),
+          ])
+      },
       html.hr([y("margin", "0.025em 0")]),
       html.hr([y("margin", "0.05em 0")]),
       html.hr([y("margin", "0.1em 0")]),
@@ -147,20 +153,19 @@ fn view(model: Model) -> Element(Event) {
         html.li([], [link([attribute.href("#id-editor")], "Yarn Code Editor")]),
         html.li([], [link([attribute.href("#id-graph")], "Graph Visualization")]),
         html.li([], [link([attribute.href("#id-instr")], "VM Instructions")]),
-        html.li([], [link([attribute.href("#id-parse")], "Parse Result")]),
+        //  html.li([], [link([attribute.href("#id-parse")], "Parse Result")]),
         html.li([], [link([attribute.href("#id-cat")], "Cat")]),
       ]),
       p(
         model.vm.filename
         <> ": Change this Yarn script and observe new behavior!",
       ),
+      id("id-error", ui.view(model.comp)),
       id("id-editor", ui.editor(model.source, model.comp, UserInput)),
       p("Visualization of the story:"),
       id("id-graph", graph_view),
       p("Compiled VM Instructions:"),
       id("id-instr", model.vm |> chat.view_instructions),
-      p("Parsed code:"),
-      id("id-parse", ui.view(model.comp)),
       id("id-cat", cat),
       html.hr([]),
       link(

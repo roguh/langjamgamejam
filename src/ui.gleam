@@ -37,10 +37,10 @@ pub fn view(yarn_artifact: YarnArtifact) -> Element(a) {
   case yarn_artifact {
     Ok(content) ->
       html.div([], [
-        code(ast.pretty(content)),
+        // code(ast.pretty(content)),
       ])
     Error(error) ->
-      html.div([y("background-color", "#330000")], [
+      html.div([y("background-color", "darkred"), y("padding", "0.5em")], [
         i(
           "Error found at line "
           <> error.line |> int.to_string
