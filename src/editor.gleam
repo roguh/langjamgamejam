@@ -16,6 +16,8 @@ import ui.{i, p, y}
 import ui/lang/yarn/chat
 import ui/lang/yarn/yarn_ui
 
+const project_link = "https://github.com/roguh/haskelloni"
+
 type Model {
   Model(
     source: String,
@@ -33,6 +35,7 @@ type Event {
   Load(String)
   YarnChoice(Int)
   YarnContinue
+  YarnNode(String)
 }
 
 fn id(id_str, elem) {
@@ -65,6 +68,7 @@ fn update(model: Model, event: Event) -> Model {
     // TWO OPTIONS IN YARN: pick a choice OR read/listen to more dialogue
     YarnChoice(index) -> Model(..model, vm: model.vm |> runner.choose(index))
     YarnContinue -> Model(..model, vm: model.vm |> runner.continue)
+    YarnNode(node) -> Model(..model, vm: model.vm |> runner.goto_node(node))
   }
 }
 
@@ -85,6 +89,8 @@ fn view(model: Model) -> Element(Event) {
             y("margin-right", "1em"),
             y("margin-bottom", "0.5em"),
             y("background-color", "darkred"),
+            y("border-color", "white"),
+            y("border-radius", "0"),
             event.on_click(Load(n)),
           ],
           [
@@ -122,7 +128,19 @@ fn view(model: Model) -> Element(Event) {
         attribute.type_("text/css"),
         attribute.href(css_link),
       ]),
-      model.vm |> chat.view(YarnContinue, YarnChoice),
+      html.hr([y("margin", "0.2em 0")]),
+      html.hr([y("margin", "0.1em 0")]),
+      html.hr([y("margin", "0.1em 0")]),
+      model.vm |> chat.view(YarnContinue, YarnChoice, YarnNode),
+      html.hr([y("margin", "0.025em 0")]),
+      html.hr([y("margin", "0.05em 0")]),
+      html.hr([y("margin", "0.1em 0")]),
+      html.hr([y("margin", "0.2em 0")]),
+      html.hr([y("margin", "0.3em 0")]),
+      html.hr([y("margin", "0.4em 0")]),
+      html.hr([]),
+      html.hr([]),
+      html.hr([y("margin", "2em 0")]),
       game_selector,
       p("Pick another tale or edit the story..."),
       html.ul([], [
@@ -130,9 +148,12 @@ fn view(model: Model) -> Element(Event) {
         html.li([], [link([attribute.href("#id-graph")], "Graph Visualization")]),
         html.li([], [link([attribute.href("#id-instr")], "VM Instructions")]),
         html.li([], [link([attribute.href("#id-parse")], "Parse Result")]),
+        html.li([], [link([attribute.href("#id-cat")], "Cat")]),
       ]),
-      html.h2([], [html.text(model.name)]),
-      p("Change this Yarn script and observe new behavior!"),
+      p(
+        model.vm.filename
+        <> ": Change this Yarn script and observe new behavior!",
+      ),
       id("id-editor", ui.editor(model.source, model.comp, UserInput)),
       p("Visualization of the story:"),
       id("id-graph", graph_view),
@@ -140,8 +161,23 @@ fn view(model: Model) -> Element(Event) {
       id("id-instr", model.vm |> chat.view_instructions),
       p("Parsed code:"),
       id("id-parse", ui.view(model.comp)),
-      cat,
+      id("id-cat", cat),
+      html.hr([]),
+      link(
+        [attribute.href(project_link)],
+        "This Yarn development environment and VM were built as part of the 2025 LangJam GameJam.",
+      ),
+      html.hr([]),
       link([attribute.href("#id-top")], "Scroll to top"),
+      html.hr([y("margin", "2em 0")]),
+      html.hr([]),
+      html.hr([]),
+      html.hr([y("margin", "0.4em 0")]),
+      html.hr([y("margin", "0.3em 0")]),
+      html.hr([y("margin", "0.2em 0")]),
+      html.hr([y("margin", "0.1em 0")]),
+      html.hr([y("margin", "0.05em 0")]),
+      html.hr([y("margin", "0.025em 0")]),
     ],
   )
 }

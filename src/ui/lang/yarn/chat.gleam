@@ -6,6 +6,7 @@ import gleam/list
 import gleam/string
 import glearray
 import lang/yarn/runner
+import lustre/attribute
 import lustre/element/html
 import lustre/event
 
@@ -35,10 +36,39 @@ fn fancy_labeled(label: String, content, color) {
   ])
 }
 
-pub fn view(vm: runner.State, on_continue, on_choice) {
+pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
   html.div([y("margin", "3em"), y("min-height", "40vh")], [
     html.div([y("margin-bottom", "3em")], [
-      html.h3([], [html.text(vm.node)]),
+      html.h3(
+        [
+          y("display", "flex"),
+          y("align-items", "center"),
+          y("justify-content", "space-between"),
+        ],
+        [
+          html.text(vm.node),
+          html.select(
+            [
+              y("display", "inline"),
+              y("width", "auto"),
+              y("margin", "0"),
+              y("margin-left", "1em"),
+              event.on_change(fn(val) {
+                case val {
+                  "" -> on_goto_node(vm.node)
+                  _ -> on_goto_node(val)
+                }
+              }),
+            ],
+            [
+              html.option([attribute.value("")], "GoTo?"),
+              ..vm.nodes
+              |> dict.to_list
+              |> list.map(fn(kv) { html.option([attribute.value(kv.0)], kv.0) })
+            ],
+          ),
+        ],
+      ),
       i("A tale discovered in a tome merely labeled: \"" <> vm.filename <> "\""),
     ]),
     html.div([], vm.say |> list.reverse |> list.map(p)),

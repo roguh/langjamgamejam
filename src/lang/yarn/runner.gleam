@@ -453,6 +453,10 @@ pub fn continue(vm: State) -> State {
   }
 }
 
+pub fn goto_node(vm: State, new) -> State {
+  State(..vm, node: new, ip: 0, state: WaitingOnContinue, choice: -1, say: [])
+}
+
 pub fn needs_choice(vm: State) -> List(String) {
   case vm.state {
     WaitingOnChoice -> vm.say
