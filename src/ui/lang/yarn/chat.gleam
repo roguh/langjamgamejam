@@ -9,7 +9,7 @@ import lang/yarn/runner
 import lustre/element/html
 import lustre/event
 
-import ui.{code, p, q, y}
+import ui.{code, i, p, q, y}
 
 fn fancy_labeled(label: String, content, color) {
   html.p([], [
@@ -36,7 +36,11 @@ fn fancy_labeled(label: String, content, color) {
 }
 
 pub fn view(vm: runner.State, on_continue, on_choice) {
-  html.div([y("margin", "3em")], [
+  html.div([y("margin", "3em"), y("min-height", "40vh")], [
+    html.div([y("margin-bottom", "3em")], [
+      html.h3([], [html.text(vm.node)]),
+      i("A tale discovered in a tome merely labeled: \"" <> vm.filename <> "\""),
+    ]),
     html.div([], vm.say |> list.reverse |> list.map(p)),
     keyed.ol(
       [],
@@ -57,7 +61,7 @@ pub fn view(vm: runner.State, on_continue, on_choice) {
       vm |> runner.needs_continue,
       html.button([event.on_click(on_continue)], [
         html.text(case vm.say {
-          [] -> ">>> LISTEN"
+          [] -> ">>> START STORY"
           _ -> ">>>"
         }),
       ]),

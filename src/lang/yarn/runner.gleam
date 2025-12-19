@@ -28,6 +28,7 @@ pub type State {
     // This is given to the user
     // It is either a list of dialogue, or a list of choices depending on the exec state
     say: List(String),
+    filename: String,
   )
 }
 
@@ -121,6 +122,7 @@ pub fn null_vm() {
     stack: [],
     node: "",
     nodes: dict.from_list([]),
+    filename: "",
   )
 }
 
@@ -242,8 +244,8 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
   |> list.flatten
 }
 
-pub fn compile_or_null(source) {
-  compile(source) |> result.unwrap(null_vm())
+pub fn compile_or_null(source, filename) {
+  State(..compile(source) |> result.unwrap(null_vm()), filename: filename)
 }
 
 pub fn compile(source: String) -> Result(State, String) {

@@ -35,6 +35,14 @@ type Event {
   YarnContinue
 }
 
+fn id(id_str, elem) {
+  html.div([attribute.id(id_str)], [elem])
+}
+
+fn link(attrs, content) {
+  html.a(attrs, [html.text(content)])
+}
+
 fn update(model: Model, event: Event) -> Model {
   case event {
     UserInput(source) ->
@@ -42,14 +50,14 @@ fn update(model: Model, event: Event) -> Model {
         ..model,
         source: source,
         comp: parse.parse(source),
-        vm: runner.compile_or_null(source),
+        vm: runner.compile_or_null(source, model.vm.filename),
         iteration: model.iteration + 1 % 2_000_000_000,
       )
     Load(source) ->
       Model(
         ..model,
         source: assets.load(source),
-        vm: runner.compile_or_null(assets.load(source)),
+        vm: runner.compile_or_null(assets.load(source), source),
         comp: parse.parse(assets.load(source)),
         iteration: model.iteration + 1 % 2_000_000_000,
         name: assets.name(source) |> option.unwrap(model.custom_name),
@@ -73,7 +81,10 @@ fn view(model: Model) -> Element(Event) {
         n,
         html.button(
           [
+            y("padding", "0.4em"),
             y("margin-right", "1em"),
+            y("margin-bottom", "0.5em"),
+            y("background-color", "darkred"),
             event.on_click(Load(n)),
           ],
           [
@@ -83,11 +94,27 @@ fn view(model: Model) -> Element(Event) {
       )
     })
   let game_selector = keyed.ul([y("margin", "0"), y("padding", "0")], gen)
+  let cat =
+    html.figure([], [
+      html.figcaption([y("font-y", "italic")], [
+        html.text(
+          "A cat looks straight at the camera while it lies sideways on a comfy wooden floor. "
+          <> model.cat_is
+          <> " preparing to play a game.",
+        ),
+      ]),
+      html.img([
+        attribute.src("https://cdn2.thecatapi.com/images/b7k.jpg"),
+      ]),
+    ])
   html.div(
     [
+      attribute.id("id-top"),
       y("display", "flex"),
+      y("max-width", "50em"),
+      y("margin", "0 auto"),
       y("flex-direction", "column"),
-      y("padding", "1em 4em"),
+      y("padding", "0.5em 0.5em"),
     ],
     [
       html.link([
@@ -97,27 +124,24 @@ fn view(model: Model) -> Element(Event) {
       ]),
       model.vm |> chat.view(YarnContinue, YarnChoice),
       game_selector,
+      p("Pick another tale or edit the story..."),
+      html.ul([], [
+        html.li([], [link([attribute.href("#id-editor")], "Yarn Code Editor")]),
+        html.li([], [link([attribute.href("#id-graph")], "Graph Visualization")]),
+        html.li([], [link([attribute.href("#id-instr")], "VM Instructions")]),
+        html.li([], [link([attribute.href("#id-parse")], "Parse Result")]),
+      ]),
       html.h2([], [html.text(model.name)]),
-      graph_view,
-      html.h3([], [
-        html.text("Editor"),
-      ]),
       p("Change this Yarn script and observe new behavior!"),
-      ui.editor(model.source, model.comp, UserInput),
-      model.vm |> chat.view_instructions,
-      ui.view(model.comp),
-      html.figure([], [
-        html.img([
-          attribute.src("https://cdn2.thecatapi.com/images/b7k.jpg"),
-        ]),
-        html.figcaption([y("font-y", "italic")], [
-          html.text(
-            "A cat looks straight at the camera while it lies sideways on a comfy wooden floor. "
-            <> model.cat_is
-            <> " preparing to play a game.",
-          ),
-        ]),
-      ]),
+      id("id-editor", ui.editor(model.source, model.comp, UserInput)),
+      p("Visualization of the story:"),
+      id("id-graph", graph_view),
+      p("Compiled VM Instructions:"),
+      id("id-instr", model.vm |> chat.view_instructions),
+      p("Parsed code:"),
+      id("id-parse", ui.view(model.comp)),
+      cat,
+      link([attribute.href("#id-top")], "Scroll to top"),
     ],
   )
 }
@@ -135,7 +159,7 @@ fn init(_args) -> Model {
     iteration: 0,
     name: assets.name(t) |> option.unwrap("(no name)"),
     custom_name: "",
-    vm: runner.compile_or_null(assets.load(t)),
+    vm: runner.compile_or_null(assets.load(t), t),
     cat_is: cat_is,
   )
 }
@@ -145,8 +169,8 @@ pub fn main() {
   case lustre.start(app, "#app", Nil) {
     Ok(_) -> Nil
     e -> {
-        echo e
-        Nil
-        }
+      echo e
+      Nil
+    }
   }
 }
