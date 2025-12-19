@@ -22,7 +22,6 @@ fn fancy_labeled(label: String, content, color) {
             y("border", "var(--pico-color) 3px"),
             y("border-radius", "7px"),
             y("padding", "0.2em 0.5em"),
-            y("margin-right", "0.5em"),
             y("background-color", color),
             // No dark/light mode
             y("color", "white"),
@@ -37,13 +36,14 @@ fn fancy_labeled(label: String, content, color) {
 }
 
 pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
-  html.div([y("margin", "3em"), y("min-height", "40vh")], [
-    html.div([y("margin-bottom", "3em")], [
-      html.h3(
+  html.div([], [
+    html.div([y("margin", "1em 0")], [
+      html.h1(
         [
           y("display", "flex"),
           y("align-items", "center"),
           y("justify-content", "space-between"),
+          y("max-width", "87.5%"),
         ],
         [
           html.text(vm.node),
@@ -71,39 +71,66 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
       ),
       i("A tale discovered in a tome merely labeled: \"" <> vm.filename <> "\""),
     ]),
-    html.div([], vm.say |> list.reverse |> list.map(p)),
-    keyed.ol(
-      [],
-      vm
-        |> runner.needs_choice
-        |> list.index_map(fn(c, i) {
-          let si = int.to_string(i)
-          #(
-            si,
-            html.li([event.on_click(on_choice(i))], [
-              html.text("Option " <> si),
-              html.text(c),
-            ]),
-          )
-        }),
+    html.div(
+      [y("margin", "1em 0"), y("min-height", "15vh")],
+      vm.say |> list.reverse |> list.map(p),
     ),
-    q(
-      vm |> runner.needs_continue,
-      html.button([event.on_click(on_continue)], [
-        html.text(case vm.say {
-          [] -> ">>> Start story"
-          _ -> ">>>"
-        }),
-      ]),
-      html.text(""),
+    html.div(
+      [
+        y("min-height", "15vh"),
+        y("max-width", "75%"),
+        y("margin", "1em auto"),
+        y("display", "flex"),
+        y("flex-direction", "column"),
+        y("align-items", "flex-end"),
+        y("justify-content", "space-between"),
+      ],
+      [
+        // TODO only show ONE control at a time, choose/continue/stopped
+        // keyed.ol(
+        //   [],
+        //   vm
+        //     |> runner.needs_choice
+        //     |> list.index_map(fn(c, i) {
+        //       let si = int.to_string(i)
+        //       #(
+        //         si,
+        //         html.li([event.on_click(on_choice(i))], [
+        //           html.text("Option " <> si),
+        //           html.text(c),
+        //         ]),
+        //       )
+        //     }),
+        // ),
+        q(
+          vm |> runner.needs_continue,
+          html.button([event.on_click(on_continue)], [
+            html.text(case vm.say {
+              [] -> ">>> Start story"
+              _ -> "> Continue"
+            }),
+          ]),
+          html.text(""),
+        ),
+        case vm.state {
+          runner.Stopped ->
+            html.div([y("font-size", "200%")], [
+              fancy_labeled("Fin", "", "darkgreen"),
+            ])
+          _ -> html.text("")
+        },
+        html.div(
+          [],
+          vm.vars
+            |> dict.to_list
+            |> list.map(fn(kv) {
+              html.div([y("margin-top", "1em"), y("font-size", "75%")], [
+                i(kv.0 <> " = " <> kv.1 |> runner.print_op),
+              ])
+            }),
+        ),
+      ],
     ),
-    case vm.state {
-      runner.Stopped ->
-        html.div([y("font-size", "200%")], [
-          fancy_labeled("Fin", "", "darkgreen"),
-        ])
-      _ -> html.text("")
-    },
   ])
 }
 

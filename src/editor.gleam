@@ -128,7 +128,6 @@ fn view(model: Model) -> Element(Event) {
         attribute.type_("text/css"),
         attribute.href(css_link),
       ]),
-      html.hr([y("margin", "0.2em 0")]),
       case result.is_ok(model.comp) {
         True -> model.vm |> chat.view(YarnContinue, YarnChoice, YarnNode)
         False ->
@@ -182,7 +181,7 @@ fn view(model: Model) -> Element(Event) {
 }
 
 fn init(_args) -> Model {
-  let t = "/tests/choices.yarn"
+  let t = "/tests/if.yarn"
   let foxnews = ["She is", "He is", "They are"]
   let cat_is = case list.sample(foxnews, 1) {
     [n] -> n
