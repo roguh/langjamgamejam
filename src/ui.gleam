@@ -8,6 +8,13 @@ import lustre/event
 
 import lang/yarn/ast.{type YarnArtifact}
 
+pub fn q(condition: Bool, a, b) {
+  case condition {
+    True -> a
+    False -> b
+  }
+}
+
 pub fn y(key: String, value: String) {
   attribute.style(key, value)
 }

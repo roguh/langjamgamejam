@@ -1,4 +1,3 @@
-import gleam/dict
 import lustre
 import lustre/attribute
 import lustre/element.{type Element}
@@ -6,17 +5,16 @@ import lustre/element/html
 import lustre/element/keyed
 import lustre/event
 
-import gleam/int
 import gleam/list
-import gleam/option.{unwrap}
-import gleam/string
+import gleam/option
 
 import lang/yarn/assets
 import lang/yarn/ast
-import lang/yarn/generate
-import lang/yarn/interpreter
 import lang/yarn/parse
+import lang/yarn/runner
 import ui.{i, p, y}
+import ui/lang/yarn/chat
+import ui/lang/yarn/yarn_ui
 
 type Model {
   Model(
@@ -26,58 +24,47 @@ type Model {
     name: String,
     custom_name: String,
     cat_is: String,
+    vm: runner.State,
   )
 }
 
 type Event {
   UserInput(String)
   Load(String)
+  YarnChoice(Int)
+  YarnContinue
 }
 
 fn update(model: Model, event: Event) -> Model {
   case event {
     UserInput(source) ->
       Model(
-        source,
-        parse.parse(source),
-        model.iteration + 1 % 2_000_000_000,
-        // TODO concise record editing in erlang
-        model.name,
-        model.custom_name,
-        model.cat_is,
+        ..model,
+        source: source,
+        comp: parse.parse(source),
+        vm: runner.compile_or_null(source),
+        iteration: model.iteration + 1 % 2_000_000_000,
       )
-    Load(content) ->
+    Load(source) ->
       Model(
-        assets.load(content),
-        parse.parse(assets.load(content)),
-        model.iteration + 1 % 2_000_000_000,
-        unwrap(assets.name(content), model.custom_name),
-        model.custom_name,
-        model.cat_is,
+        ..model,
+        source: assets.load(source),
+        vm: runner.compile_or_null(assets.load(source)),
+        comp: parse.parse(assets.load(source)),
+        iteration: model.iteration + 1 % 2_000_000_000,
+        name: assets.name(source) |> option.unwrap(model.custom_name),
       )
+    // TWO OPTIONS IN YARN: pick a choice OR read/listen to more dialogue
+    YarnChoice(index) -> Model(..model, vm: model.vm |> runner.choose(index))
+    YarnContinue -> Model(..model, vm: model.vm |> runner.continue)
   }
 }
 
 fn view(model: Model) -> Element(Event) {
   let css_link = "https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
   let graph_view = case model.comp {
-    Ok(content) -> generate.generate(content)
+    Ok(content) -> yarn_ui.view(content)
     Error(_error) -> i("Check the Yarn code for errors")
-  }
-  let vm = interpreter.compile(model.source)
-  let instr_view = case vm {
-    Ok(s) ->
-      s.nodes
-      |> dict.to_list
-      |> list.map(fn(kv) {
-        "Node: "
-        <> kv.0
-        <> "\n"
-        <> kv.1 |> list.map(interpreter.print_instr) |> string.join("\n")
-      })
-      |> string.join("\n\n")
-      |> ui.code()
-    _ -> html.text("")
   }
 
   let gen =
@@ -95,7 +82,7 @@ fn view(model: Model) -> Element(Event) {
         ),
       )
     })
-  let game_buttons = keyed.ul([y("margin", "0"), y("padding", "0")], gen)
+  let game_selector = keyed.ul([y("margin", "0"), y("padding", "0")], gen)
   html.div(
     [
       y("display", "flex"),
@@ -108,7 +95,8 @@ fn view(model: Model) -> Element(Event) {
         attribute.type_("text/css"),
         attribute.href(css_link),
       ]),
-      game_buttons,
+      model.vm |> chat.view(YarnContinue, YarnChoice),
+      game_selector,
       html.h2([], [html.text(model.name)]),
       graph_view,
       html.h3([], [
@@ -116,7 +104,7 @@ fn view(model: Model) -> Element(Event) {
       ]),
       p("Change this Yarn script and observe new behavior!"),
       ui.editor(model.source, model.comp, UserInput),
-      instr_view,
+      model.vm |> chat.view_instructions,
       ui.view(model.comp),
       html.figure([], [
         html.img([
@@ -135,19 +123,20 @@ fn view(model: Model) -> Element(Event) {
 }
 
 fn init(_args) -> Model {
-  let t = "/tests/if.yarn"
+  let t = "/tests/choices.yarn"
   let foxnews = ["She is", "He is", "They are"]
   let cat_is = case list.sample(foxnews, 1) {
     [n] -> n
     _ -> "She is"
   }
   Model(
-    assets.load(t),
-    parse.parse(assets.load(t)),
-    int.random(2_000_000_000),
-    t,
-    "(no name)",
-    cat_is,
+    source: assets.load(t),
+    comp: parse.parse(assets.load(t)),
+    iteration: 0,
+    name: assets.name(t) |> option.unwrap("(no name)"),
+    custom_name: "",
+    vm: runner.compile_or_null(assets.load(t)),
+    cat_is: cat_is,
   )
 }
 

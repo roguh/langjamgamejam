@@ -142,6 +142,8 @@ fn comparison() {
 }
 
 fn expr() {
+  // Thanks for the refresh, Varun Ramesh
+  // https://blog.varunramesh.net/posts/algebraic-expressions-using-parser-combinators/#left-associative-binary-operators
   comparison()
 }
 

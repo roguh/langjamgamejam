@@ -1,7 +1,7 @@
 import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{Some}
 import gleam/result
 import gleam/string
 import lang/yarn/ast
@@ -9,7 +9,31 @@ import lustre/attribute
 
 import lustre/element/html
 
-import ui.{i, p, y}
+import ui.{p, y}
+
+fn fancy_labeled(label: String, content, color) {
+  html.p([], [
+    case label {
+      "" -> html.text("")
+      l ->
+        html.em(
+          [
+            y("border", "var(--pico-color) 3px"),
+            y("border-radius", "7px"),
+            y("padding", "0.2em 0.5em"),
+            y("margin-right", "0.5em"),
+            y("background-color", color),
+            // No dark/light mode
+            y("color", "white"),
+          ],
+          [
+            html.text(l),
+          ],
+        )
+    },
+    html.text(content),
+  ])
+}
 
 fn print_expr(_e: ast.YarnExpr) {
   "(expr)"
@@ -147,34 +171,10 @@ fn fancy_labeled_cmd(label: String, content, color) {
   ])
 }
 
-fn fancy_labeled(label: String, content, color) {
-  html.p([], [
-    case label {
-      "" -> html.text("")
-      l ->
-        html.em(
-          [
-            y("border", "var(--pico-color) 3px"),
-            y("border-radius", "7px"),
-            y("padding", "0.2em 0.5em"),
-            y("margin-right", "0.5em"),
-            y("background-color", color),
-            // No dark/light mode
-            y("color", "white"),
-          ],
-          [
-            html.text(l),
-          ],
-        )
-    },
-    html.text(content),
-  ])
-}
-
 fn stylesheet() {
   html.style([], "p:last-child, div.node:last-child { margin-bottom: 0px; }")
 }
 
-pub fn generate(graph: ast.Yarn) {
+pub fn view(graph: ast.Yarn) {
   html.div([], [stylesheet(), ..graph.nodes |> list.index_map(gen_node)])
 }
