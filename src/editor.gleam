@@ -129,8 +129,6 @@ fn view(model: Model) -> Element(Event) {
         attribute.href(css_link),
       ]),
       html.hr([y("margin", "0.2em 0")]),
-      html.hr([y("margin", "0.1em 0")]),
-      html.hr([y("margin", "0.1em 0")]),
       case result.is_ok(model.comp) {
         True -> model.vm |> chat.view(YarnContinue, YarnChoice, YarnNode)
         False ->
@@ -138,7 +136,6 @@ fn view(model: Model) -> Element(Event) {
             html.text("Yarn error, story unable to compile!"),
           ])
       },
-      html.hr([y("margin", "0.025em 0")]),
       html.hr([y("margin", "0.05em 0")]),
       html.hr([y("margin", "0.1em 0")]),
       html.hr([y("margin", "0.2em 0")]),
@@ -167,12 +164,10 @@ fn view(model: Model) -> Element(Event) {
       p("Compiled VM Instructions:"),
       id("id-instr", model.vm |> chat.view_instructions),
       id("id-cat", cat),
-      html.hr([]),
       link(
         [attribute.href(project_link)],
         "This Yarn development environment and VM were built as part of the 2025 LangJam GameJam.",
       ),
-      html.hr([]),
       link([attribute.href("#id-top")], "Scroll to top"),
       html.hr([y("margin", "2em 0")]),
       html.hr([]),
@@ -182,7 +177,6 @@ fn view(model: Model) -> Element(Event) {
       html.hr([y("margin", "0.2em 0")]),
       html.hr([y("margin", "0.1em 0")]),
       html.hr([y("margin", "0.05em 0")]),
-      html.hr([y("margin", "0.025em 0")]),
     ],
   )
 }
