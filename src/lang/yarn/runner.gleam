@@ -50,8 +50,12 @@ pub type Instruction {
   Return
   // Go to another node
   JumpNode(node_name: String)
-  JumpIfFalse(instr_offset: Int)
+  // Unconditional jump
   Jump(instr_offset: Int)
+  // Conditional jump
+  JumpIfFalse(instr_offset: Int)
+  // Data jump: jump to number on top of stack
+  JumpToTop
   // Pop from the stack and set this variable
   Set(String)
   // Push value of variable to stack
@@ -90,6 +94,7 @@ pub fn print_instr(i: Instruction) {
     Return -> "Return"
     JumpNode(node_name) -> "JumpNode(" <> node_name <> ")"
     JumpIfFalse(instr_offset) -> "JumpIfFalse(" <> instr_offset |> s <> ")"
+    JumpToTop -> "JumpToTop"
     Jump(instr_offset) -> "Jump(" <> instr_offset |> s <> ")"
     Set(var_name) -> "Set(" <> var_name <> ")"
     Get(var_name) -> "Get(" <> var_name <> ")"
@@ -206,12 +211,32 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
           },
         )
       }
-      ast.Cmd(ast.DeclEnum(_, _)) -> todo
-      ast.Cmd(ast.Arbitrary(_, _)) -> todo
-      ast.Cmd(ast.Once(_, _, _)) -> todo
-      ast.LineGroup(_) -> todo
-      ast.Cmd(ast.Detour(node_name)) -> todo
-      ast.Cmd(ast.Return) -> todo
+      ast.Cmd(ast.Once(_, body_, _)) -> {
+        let id = "$$once_" <> int.to_string(int.random(100_000_000))
+        let body = compile_(body_)
+        list.append([Get(id), JumpIfFalse(list.length(body) + 2), ..body], [
+          Push(VBool(True)),
+          Set(id),
+        ])
+      }
+      ast.LineGroup(items) -> {
+        let compiled_items =
+          items
+          |> list.map(fn(g) {
+            list.append(compile_line(g.content), [
+              ISay(option.None),
+              IWaitContinue,
+              ..compile_(g.next)
+            ])
+          })
+        // TODO jump to random then jump to end unconditionally
+        // how to get random? how to get index of last item?
+        compiled_items |> list.flatten
+      }
+      ast.Cmd(ast.DeclEnum(_, _)) -> todo as "decl-enum not impl"
+      ast.Cmd(ast.Arbitrary(_, _)) -> todo as "arbitrary not impl"
+      ast.Cmd(ast.Detour(node_name)) -> todo as "detour not impl"
+      ast.Cmd(ast.Return) -> todo as "return not implemented"
     }
   })
   |> list.flatten
@@ -310,8 +335,10 @@ fn run_one_instr(vm, i: Instruction) {
     Unary(op) ->
       State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop |> un(op)))
     Jump(offset) -> State(..vm, ip: vm.ip + offset)
+    JumpToTop ->
+      State(..vm, ip: vm.ip + int_or(vm |> pop, 1), stack: vm |> rest)
     JumpIfFalse(offset) ->
-      State(..vm, ip: vm |> top |> if_false(vm.ip + offset, vm.ip + 1))
+      State(..vm, ip: vm.ip + if_false(vm |> top, offset, 1))
     JumpNode(n) -> State(..vm, node: n)
     Halt -> State(..vm, state: Stopped)
     Return -> todo as "runner return unimplemented"
@@ -329,6 +356,13 @@ fn next(vm: State) -> State {
     Running -> vm |> run_one_instr(i) |> next
     // no-op
     _ -> vm
+  }
+}
+
+fn int_or(v: Operand, default: Int) {
+  case v {
+    VFloat(i) -> float.round(i)
+    _ -> default
   }
 }
 

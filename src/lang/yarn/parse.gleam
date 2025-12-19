@@ -40,8 +40,8 @@ fn yarn_key() {
   pure(key)
 }
 
-fn dialog_line() {
-  use <- atto.label("dialog line")
+fn line() {
+  use <- atto.label("line")
   use name <- do(atto.try(yarn_key()))
   use text <- do(match("[^<{}=\n]+") |> ws())
   let tags = []
@@ -67,6 +67,27 @@ fn choice() {
 
 fn choices() {
   ops.some(choice()) |> atto.map(ast.Choice)
+}
+
+fn line_group_item() {
+  use <- atto.label("line group item")
+  use <- drop(try_(match("=>") |> hs()))
+  use text <- do(match("[^=<{}\n]+") |> ws())
+  use body <- do(
+    atto.try({
+      use <- drop(token("{") |> ws())
+      use x <- do(yarn_body())
+      use <- drop(token("}") |> ws())
+      pure(x)
+    }),
+  )
+  let tags = []
+  let cond = option.None
+  pure(ast.LineGroupItem([ast.Text(text)], option.unwrap(body, []), tags, cond))
+}
+
+fn line_group() {
+  ops.some(line_group_item()) |> atto.map(ast.LineGroup)
 }
 
 fn jump() {
@@ -156,6 +177,15 @@ fn set() {
   pure(ast.Set(v, e))
 }
 
+fn decl() {
+  use <- atto.label("set statement")
+  use <- drop(match("declare") |> ws())
+  use v <- do(var())
+  use <- drop(match("=") |> ws())
+  use e <- do(expr())
+  pure(ast.Decl(v, e))
+}
+
 fn if_() {
   use <- atto.label("if statement")
   use <- drop(match("if") |> ws())
@@ -194,10 +224,18 @@ fn if_() {
   pure(ast.If(e, body, list_to_none(all_elses)))
 }
 
+fn once() {
+  use <- atto.label("once statement")
+  use <- drop(match("once>>") |> ws())
+  use body <- do(yarn_body())
+  use <- drop(match("<<endonce") |> ws())
+  pure(ast.Once(option.None, body, option.None))
+}
+
 fn command() {
   use <- atto.label("command")
   use <- drop(try_(match("<<") |> ws()))
-  use cmd <- do(ops.choice([jump(), set(), if_()]))
+  use cmd <- do(ops.choice([jump(), set(), decl(), once(), if_()]))
   use <- drop(match(">>") |> ws())
   pure(ast.Cmd(cmd))
 }
@@ -212,7 +250,9 @@ fn try_(parser) {
 
 fn yarn_body() {
   use <- atto.label("body")
-  ops.many(ops.choice([try_(choices()), try_(command()), dialog_line()]))
+  ops.many(
+    ops.choice([try_(choices()), try_(command()), try_(line_group()), line()]),
+  )
 }
 
 fn header() {

@@ -1,3 +1,35 @@
+* this evening
+- DONE transcribe lore
+- test tooling: node selector UI
+- test tooling: variable viewer/setter UI
+- test: skip blank lines
+- test: linegroup
+- sprite: ship internals
+
+* friday
+playable game
+dialogue in game
+controller
+stretch: enemies
+stretch: yarn stress test, fibonacci, fft
+
+* later
+pause on commas
+animated exclamation mark
+wavy animated text, animated ...
+
+
+
+
+
+
+
+
+
+
+
+
+
 * test programs
 - TODO find a good reference Scheme interpreter
 

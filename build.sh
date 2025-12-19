@@ -1,1 +1,7 @@
-gleam build --target javascript && rm -rf practice/phaser_platformer2/src/gleamjunk && cp -r build/dev/javascript/ practice/phaser_platformer2/src/gleamjunk
+#!/usr/bin/env bash
+set -x
+IN="build/dev/javascript/"
+OUT="practice/phaser_platformer2/src/gleamjunk"
+gleam build --target javascript && \
+    rm -rf "$OUT" && \
+    cp -r "$IN" "$OUT"

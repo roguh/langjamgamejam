@@ -14,7 +14,7 @@ def parse(fname: str) -> str:
 
 def generate(base_dir: str, extension: str, output: str):
     # TODO guarantee same order on any machine
-    fnames = sorted(glob.glob(base_dir + "/*/*" + extension))
+    fnames = sorted(glob.glob(base_dir + "/tests/*" + extension))
     contents = (
         "pub const assets = ["
         + "\n  ".join(
@@ -28,7 +28,7 @@ def generate(base_dir: str, extension: str, output: str):
     if os.path.isfile(output):
         with open(output) as f:
             if f.read() == contents:
-                print("[----] Skipping", output)
+                print("[----] No update needed", output)
                 return
     with open(output, "w") as f:
         f.write(contents)

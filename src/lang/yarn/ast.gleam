@@ -81,6 +81,7 @@ pub type LineElement {
 pub type YarnLineGroupItem {
   LineGroupItem(
     content: List(LineElement),
+    next: List(YarnBody),
     tags: List(String),
     condition: Option(YarnExpr),
   )
@@ -289,6 +290,7 @@ pub fn pretty_body(b: YarnBody, depth: Int) -> String {
         <> pretty_tags(g.tags)
         <> "  // line-group "
         <> int.to_string(depth)
+        <> g.next |> pretty_lbody(depth + 1)
       })
       |> string.join("\n  ")
     Cmd(cmd) -> pretty_cmd(cmd, depth)

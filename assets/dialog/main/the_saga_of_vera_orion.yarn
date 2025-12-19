@@ -1,0 +1,221 @@
+title: Setup____
+tags: #internal_setup_only
+---
+// Declare all variables here with clear names
+// Variables will drive important gameplay actions
+
+// key variables: need to discover 3 to fly away!
+<<declare $key_drone_part_found = false>>
+<<declare $key_squirrel_part_received = false>>
+<<declare $key_engine_part_found = false>>
+
+// secrets revealed during the conversation with the tree
+<<declare $tree_galaxy_mentioned = false>>
+
+// ending types
+<<declare $ending_vera_dies = false>>
+<<declare $ending_vera_enlightened = false>>
+<<declare $ending_screen_color = false>>
+===
+
+title: IntroGame
+---
+Planet Renir
+Gallo Sector
+2678 Imperial Calendar
+Vera Orion, a bounty hunter hired by House Trench to track down their kidnapped daughter, finds herself shipwrecked on a barren planet deep within the outer-ring colonies.
+Alone with no communication to the rest of the empire, she discovers that the previous inhabitants of this jungle world are far from gone.
+Locate 3 objects across the map to repair your ship.
+===
+
+title: IntroPlanet
+---
+Planet Renir: A small jungle planet on the far reaches of the empire.
+Once home to an intelligent race of beings.
+They are long dead with only beasts and plants left standing.
+The fate of the previous inhabitants has never been discovered.
+===
+
+title: FirstTutorial
+tags: #first
+---
+Squirrel: This game has a lot of narrative!
+Squirrel: Press SPACE to speak with other beings.
+===
+
+title: RandomizedTutorial
+---
+// Well-organized and clear titles are very important in Yarn
+=> Squirrel: Lightly tap the JUMP key to jump less
+=> Squirrel: Press the DOWN key to duck or to fit into tight passages
+=> Squirrel: You can still jump immediately after falling off a platform
+// TODO: attacking, items
+Squirrel: **chitter, chitter**
+===
+
+title: SquirrelPriest
+---
+<<once>>
+Squirrel: Welcome to our home!
+Squirrel: I see your ship will require this...
+<<endonce>>
+<<set $key_squirrel_part_received true>>
+Squirrel: Before you go, you should see the Tree to the bottom-right of your screen.
+Squirrel: **chitter, chitter**
+===
+
+title: Tree
+---
+<<once>>
+*Vera places her hand against the tree
+A voice in Vera's Mind: So it is true.
+A voice in Vera's Mind: The presence I have felt has been you.
+-> Hello?
+ {A voice: Welcome Vera.
+  A voice: I have been expecting you.}
+-> Who said that?
+ {A voice: Who is less important when understanding the galaxy as I do.
+  // Clear variable names are also essential
+  <<set $tree_galaxy_mentioned true>>}
+-> Show yourself!
+ {A voice: Look around you, young one.
+  A voice: I do not require to show myself as you've seen me already.}
+<<endonce>>
+<<jump TreeConvo>>
+===
+
+title: ShipLog
+---
+-> View "Record 1"
+ {Holding power over a thousand planets stands The Sunburst Empire.
+ A highly advanced civilization that wields super weapons able to destroy suns.}
+
+-> View "Record 65"
+ {Record 65: Vera Orion
+  Your blood work has come back well.
+  It is clear that the treatment has been having the intended effect.}
+
+-> View "Record 2"
+ {I would like to extend my sincere condolences to you and your family.
+  Losing a parent is never an easy thing to go through and I am deeply sorry you have to experience such pain and heartache.
+  I know it has been over a decade since we last saw each other but I had to reach out to you in this tragic situation.
+  When you last left my clinic we had reached a real breakthrough and I would be more than willing to reignite our sessions if needed.
+  I am available anytime.
+  - Dr. Alma Senri}
+
+-> View "Record 14"
+ {Jonathan I refuse to accept this.
+  Your flagrant disrespect of the family name and your disgusting display of profanity at the ball is the last straw.
+  I am left with no choice but to disown you until you come to your senses.
+  The sooner you get this ridiculous idea out of your head the better.
+  Your father didn't put his life on the line and die to be disrespected like this.
+  You need to stop and seriously consider the reprocutions of your actions.}
+===
+
+title: TreeConvo
+---
+<<once>>
+The Tree is speaking.
+<<endonce>>
+
+-> How do you know my name? Who are you?
+ {Tree: I am known by many names. All of which have now been lost to time.
+  Tree: My understanding of the galaxy far exceeds the very age of this planet we inhabit.
+  Tree: I know by your soul who you are, Vera.
+  <<set $tree_galaxy_mentioned true>>}
+-> The galaxy? What do you mean? <<if $tree_galaxy_mentioned>>
+ {Tree: My presence has existed for eons.
+  Tree: I know who and what you are, Vera.}
+-> I don't understand. What do you mean?
+ {Tree: The very Forest around you.
+  Tree: I exist within every tree, every leaf, and every branch.
+  Tree: I have lived for eons, reaching my roots into the very core of this planet.
+  Tree: My existence is tied to this planet and so I know of every creature that walks its surface.
+  Tree: Even you, Vera.}
+
+-> You know nothing of my past.
+ {Tree: I know everything.
+  Tree: Your desire yo please your father but always falling short.
+  Tree: Your broken heart from the fracturing of your family.
+  Tree: The pain you carry for being born as someone who you are not.
+  Tree: You radiate your strife like warmth from the sun.}
+-> How could you possibly know who I am?
+ {Tree: Your very soul resonates here, my girl.
+  Tree: No matter how one was born, it is their soul that holds their identity.
+  Tree: You're destined for something grander, but you waste your time seeking the dead.}
+-> I am not some book you can read. What makes you think I would listen to you?
+ {Tree: You will listen.
+  Tree: Not with your ears, but your soul.
+  Tree: It knows the truth, like it always has.
+  Tree: Your birth didn't define who you are, and so your soul will lead you to the truth.}
+
+Then what must I do?
+...
+// The player can restart this dialogue now or choose an ending.
+===
+
+title: TreeEnding
+---
+Tree: Find the fire in your heart.
+Tree: Seek out the heat and burn away the pain.
+Tree: Your grief is the only thing holding you hostage now.
+-> I've already burned away my grief! Your words are empty.
+ {Tree: Then you are truly lost.
+  Tree: I can't allow you to leave this place.
+  Tree: Be at peace as you fade into oblivion.
+  *Vera dies as the tree consumes her
+  <<set $ending_vera_dies true>>
+  <<set $ending_screen_color red>>}
+-> I cannot. I don't know who I will become if I do.
+  {*The tree goes dim leaving Vera alone in the jungle.}
+-> You're right. I must let go.
+  {Tree: As all things die, all things live.
+  *A bright light consumes Vera.
+  <<set $ending_vera_enlightened true>>
+  <<set $ending_screen_color white>>}
+===
+
+title: ItemEnginePart
+---
+You found an important part to repair your ship.
+<<set $key_engine_part_found true>>
+===
+
+title: ItemDeadDrone
+tags: #item
+---
+Despite its age and the layers of rust it's obvious this entity was built using technology not even the Empire could conceive.
+<<if $white_heart_discovered>>
+These drones guard the resting place of the White Heart.
+<<endif>>
+Once pristine, these bots now shamble around as their bodies have begun to succumb to time.
+<<set $key_drone_part_found true>>
+===
+
+title: ItemMysteryText
+---
+This device holds a faded, but still legible inscription upon its surface.
+Translator module: Heat From Fire, Fire From Heat!
+The architect of its creation must have been imperial, but that shouldn't be possible.
+===
+
+title:
+tags: #empty title test ;)
+---
+===
+
+title: DupeTest__
+---
+a
+===
+
+title: DupeTest__
+---
+b
+===
+
+title: InternalLengthTest__
+---
+// let's see how faaaaar this dialogue can go!
+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+===

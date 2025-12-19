@@ -72,6 +72,22 @@ fn gen_lines(b: ast.YarnBody, char_colors: Dict(String, String)) {
           |> dict.get(name |> option.unwrap(""))
           |> result.unwrap("darkgreen"),
       )
+    ast.LineGroup(items) ->
+      html.div(
+        [],
+        items
+          |> list.index_map(fn(c, ix) {
+            fancy_node([
+              fancy_labeled(
+                "=> RAND " <> ix + 1 |> int.to_string,
+                c.content |> gen_line,
+                "#666611",
+              ),
+              ..c.next
+              |> list.map(gen_lines(_, char_colors))
+            ])
+          }),
+      )
     ast.Choice(items) ->
       html.div(
         [],
@@ -79,7 +95,7 @@ fn gen_lines(b: ast.YarnBody, char_colors: Dict(String, String)) {
           |> list.index_map(fn(c, ix) {
             fancy_node([
               fancy_labeled(
-                "#" <> ix + 1 |> int.to_string,
+                "-> #" <> ix + 1 |> int.to_string,
                 c.content |> gen_line,
                 "#446611",
               ),
@@ -114,6 +130,14 @@ fn gen_lines(b: ast.YarnBody, char_colors: Dict(String, String)) {
             )
           f -> catch_else(f)
         },
+      ])
+    ast.Cmd(ast.Once(_cond, t, _else)) ->
+      fancy_node([
+        fancy_labeled_cmd("once", "", "#761804"),
+        fancy_node(
+          t
+          |> list.map(gen_lines(_, char_colors)),
+        ),
       ])
     _ -> p("(other element)")
   }

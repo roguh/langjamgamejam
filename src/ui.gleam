@@ -40,7 +40,7 @@ pub fn view(yarn_artifact: YarnArtifact) -> Element(a) {
         code(ast.pretty(content)),
       ])
     Error(error) ->
-      html.div([y("background-color", "red")], [
+      html.div([y("background-color", "#330000")], [
         i(
           "Error found at line "
           <> error.line |> int.to_string
@@ -73,7 +73,7 @@ pub fn editor(source: String, artifact: YarnArtifact, edit_handler) {
               [
                 y("margin", "0"),
                 y("padding", "0 2px"),
-                y("padding-top", "0.4px"),
+                y("padding-top", "0px"),
                 y("text-align", "right"),
                 // No light mode
                 y("color", "white"),

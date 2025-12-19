@@ -1,0 +1,9 @@
+title: Cave
+---
+// This comment is ignored :)
+Narrator: Let's look inside the spooky cave...
+=> bats
+=> not bats
+<<jump Cave>>
+// ok
+===
