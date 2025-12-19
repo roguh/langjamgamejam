@@ -79,7 +79,7 @@ fn gen_lines(b: ast.YarnBody, char_colors: Dict(String, String)) {
           |> list.index_map(fn(c, ix) {
             fancy_node([
               fancy_labeled(
-                "=> RAND " <> ix + 1 |> int.to_string,
+                "=> Random " <> ix + 1 |> int.to_string,
                 c.content |> gen_line,
                 "#666611",
               ),

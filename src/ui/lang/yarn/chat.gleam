@@ -91,7 +91,7 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
       vm |> runner.needs_continue,
       html.button([event.on_click(on_continue)], [
         html.text(case vm.say {
-          [] -> ">>> START STORY"
+          [] -> ">>> Start story"
           _ -> ">>>"
         }),
       ]),
@@ -100,7 +100,7 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
     case vm.state {
       runner.Stopped ->
         html.div([y("font-size", "200%")], [
-          fancy_labeled("FIN!", "", "darkblue"),
+          fancy_labeled("Fin", "", "darkgreen"),
         ])
       _ -> html.text("")
     },
