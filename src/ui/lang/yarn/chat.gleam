@@ -69,7 +69,6 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
           ),
         ],
       ),
-      i("A tale discovered in a tome merely labeled: \"" <> vm.filename <> "\""),
     ]),
     html.div(
       [y("margin", "1em 0"), y("min-height", "15vh")],
@@ -123,14 +122,28 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
           [],
           vm.vars
             |> dict.to_list
+            |> list.reverse
             |> list.map(fn(kv) {
-              html.div([y("margin-top", "1em"), y("font-size", "75%")], [
-                i(kv.0 <> " = " <> kv.1 |> runner.print_op),
-              ])
+              html.div(
+                [
+                  y("margin-top", "1em"),
+                  y("font-size", "75%"),
+                  y("display", "flex"),
+                  y("justify-content", "space-between"),
+                ],
+                [
+                  html.text(kv.0),
+                  html.div([y("margin", "0 0.5em")], [html.text(" = ")]),
+                  html.text(kv.1 |> runner.print_op),
+                ],
+              )
             }),
         ),
       ],
     ),
+    html.div([y("margin-bottom", "1em")], [
+      i("A tale discovered in a tome merely labeled: " <> vm.filename <> ""),
+    ]),
   ])
 }
 

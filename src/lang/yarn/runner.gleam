@@ -13,6 +13,7 @@ import glearray.{type Array}
 import lang/yarn/ast
 import lang/yarn/parse
 
+
 pub type State {
   State(
     // TODO enforce state within type system?
@@ -84,6 +85,8 @@ pub fn print_op(op: Operand) {
     VNil -> "VNil"
   }
 }
+
+fn rand_id(){int.to_string(int.random(100_000_000))}
 
 fn nameify(name) {
   name |> option.map(fn(v) { v <> ": " }) |> option.unwrap("")
@@ -214,9 +217,13 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
         )
       }
       ast.Cmd(ast.Once(_, body_, _)) -> {
-        let id = "$$once_" <> int.to_string(int.random(100_000_000))
+        let id = "$$once_" <> rand_id()
         let body = compile_(body_)
-        list.append([Get(id), JumpIfFalse(list.length(body) + 2), ..body], [
+        list.append([Get(id), 
+          Unary("!"),
+          JumpIfFalse(list.length(body) + 2),
+          ..body
+        ], [
           Push(VBool(True)),
           Set(id),
         ])
@@ -409,7 +416,10 @@ fn un(a_: Operand, op: String) -> Operand {
     "!" ->
       case a_ {
         VBool(a) -> VBool(!a)
-        _ -> todo as "! runtime error"
+        VNil -> VBool(True)
+        VString("") -> VBool(True)
+        VFloat(0.0) -> VBool(True)
+        _ -> VBool(False)
       }
     _ -> todo as "unknown unary op"
   }

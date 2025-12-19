@@ -142,7 +142,7 @@ fn view(model: Model) -> Element(Event) {
       html.hr([y("margin", "0.4em 0")]),
       html.hr([]),
       html.hr([]),
-      html.hr([y("margin", "2em 0")]),
+      html.hr([y("margin", "2em 0"), y("margin-bottom", "8em")]),
       game_selector,
       p("Pick another tale or edit the story..."),
       html.ul([], [
@@ -181,7 +181,7 @@ fn view(model: Model) -> Element(Event) {
 }
 
 fn init(_args) -> Model {
-  let t = "/tests/if.yarn"
+  let t = "/tests/once.yarn"
   let foxnews = ["She is", "He is", "They are"]
   let cat_is = case list.sample(foxnews, 1) {
     [n] -> n
