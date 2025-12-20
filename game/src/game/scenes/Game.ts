@@ -13,15 +13,20 @@ import {
 const heartEmoji = "❤︎";
 const [W, H] = [1024, 768];
 
-//const DEV_MODE = true;
-const DEV_MODE = false;
+const [platW, platH] = [400, 32];
+const [spikeW, spikeH] = [200, 68];
+
+const DEV_MODE = true;
+//const DEV_MODE = false;
 const PHI = 0.5 + 5 ** 0.5 * 0.5;
 // const MAX_DIALOGUE = ".......................".length; // for width 300*PHI
 // const MAX_DIALOGUE = "................................".length; // for width 400*PHI
 const MAX_DIALOGUE = ((W / 10) * 0.95) | 0; // for width 1024
-const MAX_CHOICES = 3;
+const MAX_CHOICES = 5;
 const EMPTY_DIALOGUE = null;
 const INIT_DIALOGUE = "";
+
+let game = null;
 
 const playerConst = {
   // Speed in px/sec
@@ -34,7 +39,8 @@ const playerConst = {
   // Distance in px
   dialogueDistance: 80,
   ////  dialogueDistance: 700, // useful for testing
-  itemDistance: 95,
+  itemDistance: 75,
+  interactMinDuration: 1000,
 };
 
 type DialogueExecutionState =
@@ -57,16 +63,14 @@ export class Game extends Scene {
   public dialogueVM: string[];
   public platforms: Phaser.Physics.Arcade.StaticGroup;
   public jumpPlatform: Phaser.Physics.Arcade.StaticGroup;
+  public spikes: Phaser.Physics.Arcade.StaticGroup;
   public bombs: Phaser.Physics.Arcade.Group;
   public dialogueElements: (
     | Phaser.GameObjects.GameObject
     | Phaser.GameObjects.Text
   )[] = [];
-  public dialogueChoiceElements: (
-    | Phaser.GameObjects.GameObject
-    | Phaser.GameObjects.Text
-  )[] = [];
-  public dialogueChoices: Phaser.GameObjects.Text[];
+  public dialogueChoiceText: Phaser.GameObjects.Text[][] = [];
+  public dialogueChoiceElements: Phaser.GameObjects.GameObject[][] = [];
   public dialogueBox: Phaser.GameObjects.GameObject;
   public dialogueText: Phaser.GameObjects.Text;
   public dialogueHow: Phaser.GameObjects.Text;
@@ -76,9 +80,16 @@ export class Game extends Scene {
     | Phaser.GameObjects.Text
   )[] = [];
   public dashBar: Phaser.GameObjects.GameObject;
-  public itemText: Phaser.GameObjects.Text;
-  public itemBack: Phaser.GameObjects.GameObject[];
+  public canInteractText: Phaser.GameObjects.Text;
+  public descText: Phaser.GameObjects.Text;
+  public descBack: Phaser.GameObjects.GameObject[];
+  public gameover: boolean = false;
+  public gameoverText: Phaser.GameObjects.Text;
+  public gameoverBack: Phaser.GameObjects.GameObject;
+  public isInteracting: boolean = false;
+  public canInteract: boolean = false;
   public player: Phaser.Physics.Arcade.Sprite;
+  public foundSupplies: boolean = false;
   public chest: Phaser.Physics.Arcade.Sprite;
   public ship: Phaser.Physics.Arcade.Sprite;
   public tree: Phaser.Physics.Arcade.Sprite;
@@ -95,12 +106,14 @@ export class Game extends Scene {
   public coyoteTime: number = 200; // milliseconds
   public cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   public wasd?: object;
+  public vm: object;
+  public init_vm: object;
 
   constructor() {
     super("Game");
+    game = this;
     this.dialogueState = "WaitingOnContinue";
     this.dialogueVM = [
-      "...",
       "Hello, fair traveler!",
       "The Tree is found deeper into the woods towards the bottom-right side of your screen :)",
     ];
@@ -108,13 +121,13 @@ export class Game extends Scene {
     this.items = [];
     this.conversationalists = {};
 
-    let vm = compile_or_null("title: Test\n---\na b c===\n");
-    console.log(needs_continue(vm));
-    vm = continue$(vm);
-    console.log(gleamList(saying(vm)).join("\n"));
-    vm = set_var_bool(vm, "$jstest", true);
-    console.log(get_var(vm, "$$$$$notexists"));
-    console.log(get_var(vm, "$jstest")[0]);
+    this.init_vm = this.vm = compile_or_null("title: Test\n---\na b c===\n");
+    console.log(needs_continue(this.vm));
+    this.vm = continue$(this.vm);
+    console.log(gleamList(saying(this.vm)).join("\n"));
+    this.vm = set_var_bool(this.vm, "$jstest", true);
+    console.log(get_var(this.vm, "$$$$$notexists"));
+    console.log(get_var(this.vm, "$jstest")[0]);
   }
 
   preload() {
@@ -123,6 +136,7 @@ export class Game extends Scene {
     this.load.image("background", "bg.png");
     // 400px,32px
     this.load.image("ground", "sprites/grassy_platform.png");
+    this.load.image("spikes", "sprites/spikes.png");
     this.load.image("star", "star.png");
     this.load.image("bomb", "bomb.png");
     this.load.image("chest", "sprites/chest.png");
@@ -207,13 +221,26 @@ export class Game extends Scene {
   }
 
   setupIntroLevel() {
+    this.squirrels = this.physics.add.group();
+    this.spikes = this.physics.add.staticGroup();
     this.platforms = this.physics.add.staticGroup();
+
     // Refresh required after scaling
-    this.platforms.create(400, 568, "ground").setScale(2).refreshBody();
-    this.platforms.create(600, 400, "ground");
+    this.platforms.create(600, platW, "ground");
     this.platforms.create(50, 250, "ground");
     this.platforms.create(750, 220, "ground");
+    this.platforms.create(400, 568, "ground").setScale(2).refreshBody();
     this.platforms.create(1300, 568, "ground").setScale(2).refreshBody();
+    this.spikes.create(1300 - platW - spikeW / 4, 568 + spikeH / 2, "spikes");
+    this.platforms
+      .create(-600 - platW * 2, 568, "ground")
+      .setScale(3.2, 2)
+      .refreshBody();
+    const shipPlat = this.platforms
+      .create(-600, 568, "ground")
+      .setScale(2)
+      .refreshBody();
+    this.spikes.create(-600 + platW + spikeW / 2, 568 + spikeH / 2, "spikes");
     const shipfloor = this.platforms.create(-600, 568 - 67, "ground");
     shipfloor.alpha = 0;
     const _shipwall = this.platforms.add(
@@ -222,10 +249,6 @@ export class Game extends Scene {
         .setAlpha(0)
         .setOrigin(0),
     );
-    const shipPlat = this.platforms
-      .create(-600, 568, "ground")
-      .setScale(2)
-      .refreshBody();
     this.platforms.children.iterate((p) =>
       // Fake 3D effect, top of platform is above player's feet
       p.setSize(p.body?.width, (p?.body.height || 100) * 0.6),
@@ -236,12 +259,20 @@ export class Game extends Scene {
       .setScale(2);
 
     // Squirrels
-    this.squirrels = this.physics.add.group();
+    const rescueSquirrel = this.squirrels
+      .create(-600 - platW - 60, 350, "squirrel")
+      .setBounce(0.2)
+      .setFlipX(true)
+      .setCollideWorldBounds(true)
+      .setScale(1.5)
+      .setSize(40, 48);
+    this.conversationalists.RescueSquirrel = rescueSquirrel;
     this.squirrels
       .create(400, 350, "squirrel")
       .setBounce(0.2)
       .setCollideWorldBounds(true)
-      .setScale(1.5);
+      .setScale(1.5)
+      .setSize(40, 48);
     this.squirrels
       .create(100, 200, "squirrel")
       .setBounce(0.2)
@@ -263,13 +294,22 @@ export class Game extends Scene {
       .staticSprite(680, 150, "chest")
       .setOrigin(0)
       .refreshBody();
+    this.items.push({
+      obj: this.chest,
+      text: "This chest contains the right materials to repair your engine.",
+    });
 
     this.conversationalists.SquirrelPriest = mainSquirrel;
     this.squirrels.children.iterate((obj) => {
       if (obj === mainSquirrel) return null;
       this.items.push({
         obj,
-        text: `A squirrel sits watching another squirrel attentively.`,
+        // TODO get Node text from VM?
+        text: Math.RND.pick([
+          "A squirrel sits watching another squirrel attentively",
+          "**chitter chitter**",
+          "It's just a squirrel",
+        ]),
       });
       return null;
     });
@@ -339,7 +379,7 @@ export class Game extends Scene {
 
   setupUI() {
     this.statusText = this.add
-      .text(32 * 1.5, 32 * 1.5, "Health: " + heartEmoji.repeat(5), {
+      .text(32 * 1.5, 32 * 1.5, heartEmoji.repeat(5), {
         fontSize: "22px",
         color: "#000",
       })
@@ -351,22 +391,39 @@ export class Game extends Scene {
       .setDepth(95);
     this.statusElements = [this.statusText, this.dashBar];
     this.statusElements.forEach((e) => (e || e?.body).setScrollFactor(0));
-    this.itemBack = [
+    this.descBack = [
       this.add
-        .rectangle(W - 32 * 10.5, 32, 32 * 10, (32 * 10) / PHI, 0xff1964)
-        .setOrigin(0)
+        .rectangle(W / 2, H / 2, W / PHI, H / PHI, 0x000000)
         .setDepth(95)
         .setScrollFactor(0),
     ];
-    this.itemText = this.add
-      .text(W - 32 * 10, 32 * 1.5, "", {
+    this.descText = this.add
+      .text(W / 2, H / 2, "", {
+        fontSize: "22px",
+        color: "#ffffff",
+      })
+      .setDepth(96)
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    this.canInteractText = this.add
+      .text(W / 2, H / 2 - this.player.displayHeight + 32, "", {
         fontSize: "22px",
         color: "#000",
-        stroke: "#999",
-        strokeThickness: 1,
       })
-      .setOrigin(0)
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+    this.gameoverBack = this.add
+      .rectangle(W / 2, H / 2, W, H / PHI / 5, 0x000000)
+      .setDepth(95)
+      .setAlpha(0)
+      .setScrollFactor(0);
+    this.gameoverText = this.add
+      .text(W / 2, H / 2, "", {
+        fontSize: "40px",
+        color: "#ffffff",
+      })
       .setDepth(96)
+      .setOrigin(0.5)
       .setScrollFactor(0);
 
     const dialogueW = W;
@@ -397,24 +454,23 @@ export class Game extends Scene {
       })
       .setOrigin(0)
       .setDepth(96);
-    this.dialogueChoices = new Array(MAX_CHOICES).fill(undefined).map((_, i) =>
-      this.add
-        .text(
-          96 * PHI,
-          H - dialogueH - 64 - 32 * i - 12,
-          `Dialogue option ${i + 1}`,
-          {
-            fontSize: "24px",
-            color: "#000",
-            stroke: "#000",
-            strokeThickness: 1,
-          },
-        )
-        .setOrigin(0)
-        .setDepth(96),
-    );
-    const dialogueChoiceBack = [
-      ...this.dialogueChoices.map((_, i) =>
+    this.dialogueChoiceText = new Array(MAX_CHOICES)
+      .fill(undefined)
+      .map((_, i) => [
+        this.add
+          .text(
+            96 * PHI,
+            H - dialogueH - 64 - 32 * i - 12,
+            `Dialogue option ${i + 1}`,
+            {
+              fontSize: "24px",
+              color: "#000",
+              stroke: "#000",
+              strokeThickness: 1,
+            },
+          )
+          .setOrigin(0)
+          .setDepth(96),
         this.add
           .text(32 * PHI, H - dialogueH - 64 - 32 * i - 12, `> ${i + 1}`, {
             fontSize: "24px",
@@ -424,8 +480,10 @@ export class Game extends Scene {
           })
           .setOrigin(0)
           .setDepth(96),
-      ),
-      ...this.dialogueChoices.map((_, i) =>
+      ]);
+    this.dialogueChoiceElements = new Array(MAX_CHOICES)
+      .fill(undefined)
+      .map((_, i) => [
         this.add
           .rectangle(
             32 * PHI - 16,
@@ -436,8 +494,6 @@ export class Game extends Scene {
           )
           .setOrigin(0)
           .setDepth(95),
-      ),
-      ...this.dialogueChoices.map((_, i) =>
         this.add
           .rectangle(
             64 * PHI + 32,
@@ -448,70 +504,73 @@ export class Game extends Scene {
           )
           .setOrigin(0)
           .setDepth(94),
-      ),
-    ];
-    this.dialogueChoiceElements = [
-      ...this.dialogueChoices,
-      ...dialogueChoiceBack,
-    ];
+      ]);
     this.dialogueElements = [
       this.dialogueBox,
       this.dialogueHow,
       dialogueHowBox,
       this.dialogueText,
-      ...this.dialogueChoices,
-      ...dialogueChoiceBack,
+      ...this.dialogueChoiceElements.flat(),
+      ...this.dialogueChoiceText.flat(),
     ];
-    this.dialogueElements.forEach((e) => (e || e?.body).setScrollFactor(0));
-    this.dialogueChoiceElements.forEach((e) =>
-      (e || e?.body).setScrollFactor(0),
-    );
+    this.dialogueElements.forEach((e) => e.setScrollFactor(0));
   }
 
   setupLowerLevel() {
-    this.add.rectangle(-W * 2, H, W * 4, H * 2, 0x103020).setOrigin(0);
+    this.add.rectangle(-W * 4, H, W * 8, H * 3, 0x205030).setOrigin(0);
     this.platforms.add(
       this.add
-        .rectangle(-W * 2, H * 2.9, W * 4, H * 0.1, 0x102010)
+        .rectangle(-W * 2, H * 2.9, W * 4, H * 0.2, 0x201410)
         .setOrigin(0),
+    );
+    this.platforms.add(
+      this.add
+        .rectangle(-W * 2, H * 2.9, W * 4, H * 0.05, 0x102010)
+        .setOrigin(0),
+    );
+    this.platforms.add(
+      this.add.rectangle(-W * 2, H * 3.1, W * 4, H, 0x040602).setOrigin(0),
     );
     this.tree = this.physics.add.sprite(-W, H * 2, "tree");
     this.tree.body.setSize(
       this.tree.body?.width,
       (this.tree?.body.height || 100) * 0.7,
     );
+    this.conversationalists.Tree = this.tree;
     this.jumpPlatform = this.physics.add.staticGroup();
     this.jumpPlatform.add(
-      this.add.rectangle(800, H * 2.8, W / 2, H * 0.05, 0x882211).setOrigin(0),
+      this.add
+        .rectangle(W * 0.8, H * 2.8, W / 2, H * 0.05, 0x882211)
+        .setOrigin(0),
     );
 
     this.squirrels
-      .create(W / 3, H * 2.5, "squirrel")
+      .create(W * 0.4, H * 2.5, "squirrel")
       .setBounce(0.2)
       .setCollideWorldBounds(true)
       .setScale(2)
       .refreshBody();
     this.squirrels
-      .create(W / 4, H * 2.5, "squirrel")
+      .create(W * 0.5, H * 2.5, "squirrel")
       .setBounce(0.2)
       .setCollideWorldBounds(true)
       .setScale(2)
       .refreshBody();
     const squirrel2 = this.squirrels
-      .create(W / 2, H * 2.5, "squirrel")
+      .create(W * 0.7, H * 2.5, "squirrel")
       .setBounce(0.2)
       .setCollideWorldBounds(true)
       .setScale(4)
       .refreshBody();
     squirrel2.flipX = true;
 
-    this.conversationalists.SquirrelUnderdog = squirrel2;
+    this.conversationalists.SquirrelLowerLevel = squirrel2;
     this.squirrels.children.iterate((obj) => {
       if (obj === squirrel2 || this.items.map(({ obj }) => obj).includes(obj))
         return null;
       this.items.push({
         obj,
-        text: `A squirrel sits watching another squirrel attentively.`,
+        text: "A squirrel sits watching another squirrel attentively",
       });
       return null;
     });
@@ -519,7 +578,8 @@ export class Game extends Scene {
 
   create() {
     // 512,384 is the center of the screen
-    this.add.tileSprite(512, 384, W * 4, H, "background");
+    this.add.tileSprite(512, 384 - H, W * 9, H, "background").setFlipY(true);
+    this.add.tileSprite(512, 384, W * 9, H, "background");
 
     this.introText();
     this.physics.world.setBounds(-W * 2, 0, W * 4, H * 3);
@@ -532,6 +592,7 @@ export class Game extends Scene {
       .setBounce(0.2)
       .setScale(0.73)
       .setAlpha(0.95)
+      .setCollideWorldBounds(true)
       .refreshBody();
     this.player.setSize(
       (this.player.body?.width || 0) / 2,
@@ -564,6 +625,7 @@ export class Game extends Scene {
     this.physics.add.collider(this.tree, this.platforms);
     this.physics.add.collider(this.squirrels, this.platforms);
     this.physics.add.collider(this.player, this.bombs, this.hitBomb);
+    this.physics.add.collider(this.player, this.spikes, this.hitSpike);
     this.physics.add.collider(this.player, this.chest, this.hitChest);
   }
 
@@ -614,8 +676,14 @@ export class Game extends Scene {
   ) {
     let next;
     this.dialogueElements.map((e) => (e.alpha = 1));
+    this.dialogueChoiceElements.forEach((l) =>
+      l.forEach((e) => (e.alpha = 0.65)),
+    );
     if (this.dialogueState !== "WaitingOnOptionSelection") {
-      this.dialogueChoiceElements.forEach((e) => (e.alpha = 0));
+      this.dialogueChoiceText.forEach((l) => l.forEach((e) => (e.alpha = 0)));
+      this.dialogueChoiceElements.forEach((l) =>
+        l.forEach((e) => (e.alpha = 0)),
+      );
     }
     this.dialogueBox.alpha = 0.65;
     const name = yarnNodeName;
@@ -653,18 +721,26 @@ export class Game extends Scene {
     this.playerTimes.dialogueStart = this.time.now;
   }
 
-  updateInventory(desc: string, obj: Phaser.GameObjects.GameObject) {
+  updateInventory(text: string, obj: Phaser.GameObjects.GameObject) {
     const ox = obj.body?.position.x || 0;
     const oy = (obj.body?.position.y || 0) - 32;
-    this.itemBack.forEach((e) => {
-      e.alpha = 0.65;
+    this.descBack.forEach((e) => {
+      e.alpha = 0.55;
     });
-    this.itemText.alpha = 1;
-    this.itemText.setText(wrap(desc, "A squirrel sites watc".length));
+    this.descText.alpha = 1;
+    this.descText.setText(wrap(text, 45));
+
+    // hack
+    if (obj === this.chest) {
+      // set VM variable
+      this.foundSupplies = true;
+      this.vm = set_var_bool(this.vm, "$foundSupplies", true);
+      console.log("Found supplies?", get_var(this.vm, "$foundSupplies")[0]);
+    }
   }
   closeInventory() {
-    this.itemBack.forEach((e) => (e.alpha = 0));
-    this.itemText.alpha = 0;
+    this.descBack.forEach((e) => (e.alpha = 0));
+    this.descText.alpha = 0;
   }
 
   pad(checker: (pad: Phaser.Input.Gamepad.Gamepad) => boolean) {
@@ -695,19 +771,25 @@ export class Game extends Scene {
       this.cursors?.shift.isDown ||
       this.pad((p) => p.R1 > 0.5 || p.R2 > 0.5 || p.A);
 
+    if (lDown || rDown || uDown || dDown) {
+      this.isInteracting = false;
+    }
+
     // Camera follow
     this.camera.centerOnX(this.player.x);
     if (this.player.y % H) {
       this.camera.centerOnY(this.player.y);
     }
 
-    if (this.player.y > H * 1.1) {
+    if (this.player.y > H * 1.3) {
       // Night mode
-      this.statusText.setColor("#ff1964");
-      this.dashBar.fillColor = 0xff1964;
+      this.statusText.setColor("#fff");
+      this.dashBar.fillColor = 0xffffff;
+      this.canInteractText.setColor("#fff");
     } else {
       this.statusText.setColor("#000000");
       this.dashBar.fillColor = 0x000000;
+      this.canInteractText.setColor("#000000");
     }
 
     if (this.player.y > H * 6) {
@@ -818,6 +900,7 @@ export class Game extends Scene {
   }
 
   update() {
+    if (this.gameover) return;
     const spaceJustUp =
       (this.cursors?.space && Input.Keyboard.JustUp(this.cursors?.space)) ||
       this.pad((p) => p.X || p.Y);
@@ -832,9 +915,11 @@ export class Game extends Scene {
     const talkers = Object.entries(this.conversationalists).filter(
       ([yarnNode, obj]) =>
         Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y) <
-        playerConst.dialogueDistance,
+        (obj.width > playerConst.dialogueDistance
+          ? obj.width / 2
+          : playerConst.dialogueDistance),
     );
-    if (talkers.length > 0) {
+    if (talkers.length > 0 && talkers.length > 0) {
       this.updateDialogue(spaceJustUp, ...talkers[0]);
     } else {
       this.closeDialogue();
@@ -848,21 +933,61 @@ export class Game extends Scene {
           obj.body?.position.y ?? -Infinity,
         ) < playerConst.itemDistance,
     );
-    if (nearbyItems.length > 0) {
+
+    // Messy UI code!
+    if (nearbyItems.length > 0 && talkers.length === 0 && this.isInteracting) {
       this.updateInventory(nearbyItems[0].text, nearbyItems[0].obj);
     } else {
       this.closeInventory();
+    }
+    const nearInteractive = talkers.length > 0 || nearbyItems.length > 0;
+    this.canInteract = nearInteractive && !this.isInteracting;
+    if (this.canInteract) {
+      this.canInteractText.setText(talkers.length > 0 ? "➥Listen" : "➦View");
+      if (spaceJustUp) {
+        this.isInteracting = true;
+      }
+    } else {
+      this.canInteractText.setText("");
+    }
+    if (!nearInteractive) {
+      this.isInteracting = false;
     }
 
     // Although we've added a lot of code it should all be pretty readable.
     this.updatePlayer();
   }
 
-  hitBomb(_a: any, _b: any) {
-    this.physics?.pause();
+  restart() {
+    this.vm = this.init_vm;
+    this.gameover = false;
+    this.anims.resumeAll();
+    this.scene.restart();
   }
 
-  hitChest(player, chest) {
-    console.log("Chest!");
+  gameOver(text: string) {
+    this.anims.pauseAll();
+    this.gameoverText.setText("Game Over: " + text);
+    this.gameoverBack.alpha = 1;
+    this.gameover = true;
+    this.time.addEvent({
+      delay: 40,
+      callback: () => this.physics?.pause(),
+    });
+    this.time.addEvent({
+      delay: 2000,
+      callback: () => this.restart(),
+    });
   }
+
+  hitBomb(_bomb: any, player: Phaser.GameObjects.Sprite) {
+    _bomb.alpha = 0;
+    game.gameOver("You hit a bomb.");
+  }
+
+  hitSpike(_a, _b) {
+    game.gameOver("You landed on a spike.");
+  }
+
+  hitChest(player, chest) {}
 }
