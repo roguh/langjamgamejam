@@ -142,9 +142,9 @@ fn view(model: Model) -> Element(Event) {
       html.hr([y("margin", "0.4em 0")]),
       html.hr([]),
       html.hr([]),
-      html.hr([y("margin", "2em 0"), y("margin-bottom", "8em")]),
-      game_selector,
+      html.hr([y("margin", "2em 0"), y("margin-bottom", "12em")]),
       p("Pick another tale or edit the story..."),
+      game_selector,
       html.ul([], [
         html.li([], [link([attribute.href("#id-editor")], "Yarn Code Editor")]),
         html.li([], [link([attribute.href("#id-graph")], "Graph Visualization")]),
