@@ -13,6 +13,7 @@ import {
 const heartEmoji = "❤︎";
 const [W, H] = [1024, 768];
 
+//const DEV_MODE = true;
 const DEV_MODE = false;
 const PHI = 0.5 + 5 ** 0.5 * 0.5;
 // const MAX_DIALOGUE = ".......................".length; // for width 300*PHI
@@ -212,6 +213,7 @@ export class Game extends Scene {
     this.platforms.create(600, 400, "ground");
     this.platforms.create(50, 250, "ground");
     this.platforms.create(750, 220, "ground");
+    this.platforms.create(1300, 568, "ground").setScale(2).refreshBody();
     const shipfloor = this.platforms.create(-600, 568 - 67, "ground");
     shipfloor.alpha = 0;
     const _shipwall = this.platforms.add(
