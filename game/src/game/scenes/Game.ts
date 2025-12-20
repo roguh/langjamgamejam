@@ -10,6 +10,7 @@ import {
   // goto_node,
 } from "../../gleamjunk/glisten48/lang/yarn/runner";
 
+const heartEmoji = "❤︎";
 const [W, H] = [1024, 768];
 
 const DEV_MODE = true;
@@ -24,11 +25,11 @@ const INIT_DIALOGUE = "";
 const playerConst = {
   // Speed in px/sec
   horiz: 260,
-  dashHoriz: 750,
-  vert: 430,
+  dashHoriz: 550,
+  vert: 370,
   // Durations in milliseconds
-  dashDuration: 700,
-  restDuration: 2000,
+  dashDuration: 2000,
+  restDuration: 3500,
   // Distance in px
   dialogueDistance: 80,
   ////  dialogueDistance: 700, // useful for testing
@@ -54,7 +55,7 @@ export class Game extends Scene {
   public dialogueState: DialogueExecutionState;
   public dialogueVM: string[];
   public platforms: Phaser.Physics.Arcade.StaticGroup;
-  public passThru: Phaser.Physics.Arcade.StaticGroup;
+  public jumpPlatform: Phaser.Physics.Arcade.StaticGroup;
   public bombs: Phaser.Physics.Arcade.Group;
   public dialogueElements: (
     | Phaser.GameObjects.GameObject
@@ -77,6 +78,9 @@ export class Game extends Scene {
   public itemText: Phaser.GameObjects.Text;
   public itemBack: Phaser.GameObjects.GameObject[];
   public player: Phaser.Physics.Arcade.Sprite;
+  public chest: Phaser.Physics.Arcade.Sprite;
+  public ship: Phaser.Physics.Arcade.Sprite;
+  public tree: Phaser.Physics.Arcade.Sprite;
   public squirrels: Phaser.Physics.Arcade.Group;
   public conversationalists: Record<string, Phaser.Physics.Arcade.Sprite>;
   public items: { text: string; obj: Phaser.GameObjects.GameObject }[] = [];
@@ -117,9 +121,19 @@ export class Game extends Scene {
 
     this.load.image("background", "bg.png");
     // 400px,32px
-    this.load.image("ground", "platform.png");
+    this.load.image("ground", "sprites/grassy_platform.png");
     this.load.image("star", "star.png");
     this.load.image("bomb", "bomb.png");
+    this.load.image("chest", "sprites/chest.png");
+    this.load.image("tree", "sprites/tree.png");
+    this.load.spritesheet("ship", "sprites/ship.png", {
+      frameWidth: 675 / 2,
+      frameHeight: 168,
+    });
+    this.load.spritesheet("vera", "sprites/sama.png", {
+      frameWidth: 150,
+      frameHeight: 144,
+    });
     this.load.spritesheet("thedude", "dude.png", {
       frameWidth: 32,
       frameHeight: 48,
@@ -128,21 +142,20 @@ export class Game extends Scene {
       frameWidth: 80,
       frameHeight: 48,
     });
-    // TODO the ship
-    // TODO Vera Orion
-    // TODO tree
-    // TODO drone
+    // TODO drone, laser
     // TODO dead drone
-    // TODO chest
-    // TODO other fuel source?
+    // TODO open chest
+    // TODO ship lore
+    // TODO squirrel tutorial
+    // TODO squirrel priest directions
   }
 
   introText() {
-    const viewTime = DEV_MODE ? 0.01 : 1;
+    const viewTime = DEV_MODE ? 0.3 : 3;
     const transTime = DEV_MODE ? 1 : 4;
     const text = [
       this.add
-        .text(W / 2, H / 2, "Axelloni: A narrative platformer.", {
+        .text(W / 2, H / 2, "Heat from Fire, Fire from Heat", {
           fontFamily: "Arial Black",
           fontSize: 38,
           color: "#ff1964",
@@ -154,7 +167,7 @@ export class Game extends Scene {
         .text(
           W / 2,
           H / 2 + 70,
-          "Made by your favorite game studio in the Mountain States of the U.S.A.\nNo generative AI.",
+          "A narrative platformer made in the Mountain States\nNo generative AI",
           {
             fontFamily: "Arial Black",
             fontSize: 27,
@@ -199,8 +212,26 @@ export class Game extends Scene {
     this.platforms.create(600, 400, "ground");
     this.platforms.create(50, 250, "ground");
     this.platforms.create(750, 220, "ground");
-    this.passThru = this.physics.add.staticGroup();
-    this.passThru.create(800, 568, "ground").setOrigin(0);
+    const shipfloor = this.platforms.create(-600, 568 - 67, "ground");
+    shipfloor.alpha = 0;
+    const _shipwall = this.platforms.add(
+      this.add
+        .rectangle(-600 - 390, 568 - 67 - 125, 180, 250, 0x000000)
+        .setAlpha(0)
+        .setOrigin(0),
+    );
+    const shipPlat = this.platforms
+      .create(-600, 568, "ground")
+      .setScale(2)
+      .refreshBody();
+    this.platforms.children.iterate((p) =>
+      // Fake 3D effect, top of platform is above player's feet
+      p.setSize(p.body?.width, (p?.body.height || 100) * 0.6),
+    );
+
+    this.ship = this.physics.add
+      .staticSprite(shipPlat.x - 100, shipPlat.y - 168 + 48, "ship")
+      .setScale(2);
 
     // Squirrels
     this.squirrels = this.physics.add.group();
@@ -226,6 +257,10 @@ export class Game extends Scene {
       .setScale(1.5)
       .refreshBody();
     mainSquirrel.flipX = true;
+    this.chest = this.physics.add
+      .staticSprite(680, 150, "chest")
+      .setOrigin(0)
+      .refreshBody();
 
     this.conversationalists.SquirrelPriest = mainSquirrel;
     this.squirrels.children.iterate((obj) => {
@@ -240,37 +275,54 @@ export class Game extends Scene {
 
   setupAnims() {
     this.anims.create({
-      key: "left",
-      frames: this.anims.generateFrameNumbers("thedude", { start: 0, end: 3 }),
+      key: "ship-interior",
+      frames: this.anims.generateFrameNumbers("ship", { start: 1, end: 1 }),
+    });
+    this.anims.create({
+      key: "ship-exterior",
+      frames: this.anims.generateFrameNumbers("ship", { start: 0, end: 0 }),
+    });
+    this.anims.create({
+      key: "idle",
+      frames: this.anims.generateFrameNumbers("vera", { start: 0, end: 0 }),
       frameRate: 14,
-      //  The 'repeat -1' value tells the animation to loop.
       repeat: -1,
     });
     this.anims.create({
-      key: "right",
-      frames: this.anims.generateFrameNumbers("thedude", { start: 5, end: 8 }),
-      frameRate: 14,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: "leftDodge",
-      frames: this.anims.generateFrameNumbers("thedude", {
+      key: "idleDodge",
+      frames: this.anims.generateFrameNumbers("vera", {
         start: 11,
-        end: 12,
+        end: 11,
       }),
       frameRate: 14,
       repeat: -1,
     });
     this.anims.create({
-      key: "rightDodge",
-      frames: this.anims.generateFrameNumbers("thedude", { start: 9, end: 10 }),
+      key: "jump",
+      frames: this.anims.generateFrameNumbers("vera", { start: 9, end: 9 }),
       frameRate: 14,
       repeat: -1,
     });
     this.anims.create({
-      key: "turn",
-      frames: [{ key: "thedude", frame: 4 }],
-      frameRate: 20,
+      key: "fall",
+      frames: this.anims.generateFrameNumbers("vera", { start: 10, end: 10 }),
+      frameRate: 14,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: "right",
+      frames: this.anims.generateFrameNumbers("vera", { start: 1, end: 8 }),
+      frameRate: 14,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: "rightDodge",
+      frames: this.anims.generateFrameNumbers("vera", {
+        start: 11,
+        end: 11 + 6,
+      }),
+      frameRate: 14,
+      repeat: -1,
     });
     this.anims.create({
       key: "squirrel-idle",
@@ -285,16 +337,14 @@ export class Game extends Scene {
 
   setupUI() {
     this.statusText = this.add
-      .text(32 * 1.5, 32 * 1.5, "Health: +++++\nFuel: 0", {
+      .text(32 * 1.5, 32 * 1.5, "Health: " + heartEmoji.repeat(5), {
         fontSize: "22px",
         color: "#000",
-        stroke: "#444",
-        strokeThickness: 2,
       })
       .setOrigin(0)
       .setDepth(96);
     this.dashBar = this.add
-      .rectangle(32 * 1.5, 32 * 1.5 + 32 * 2, 0, 12, 0x101010)
+      .rectangle(32 * 1.5, 32 * 1.5 + 12 * 2, 0, 12, 0x101010)
       .setOrigin(0)
       .setDepth(95);
     this.statusElements = [this.statusText, this.dashBar];
@@ -417,7 +467,21 @@ export class Game extends Scene {
   }
 
   setupLowerLevel() {
-    this.add.rectangle(-W * 2, H * 2, W * 4, H, 0x103020).setOrigin(0);
+    this.add.rectangle(-W * 2, H, W * 4, H * 2, 0x103020).setOrigin(0);
+    this.platforms.add(
+      this.add
+        .rectangle(-W * 2, H * 2.9, W * 4, H * 0.1, 0x102010)
+        .setOrigin(0),
+    );
+    this.tree = this.physics.add.sprite(-W, H * 2, "tree");
+    this.tree.body.setSize(
+      this.tree.body?.width,
+      (this.tree?.body.height || 100) * 0.7,
+    );
+    this.jumpPlatform = this.physics.add.staticGroup();
+    this.jumpPlatform.add(
+      this.add.rectangle(800, H * 2.8, W / 2, H * 0.05, 0x882211).setOrigin(0),
+    );
 
     this.squirrels
       .create(W / 3, H * 2.5, "squirrel")
@@ -460,27 +524,17 @@ export class Game extends Scene {
 
     this.setupIntroLevel();
     this.setupLowerLevel();
-
-    this.camera = this.cameras.main;
-
     // The Dude abides
     this.player = this.physics.add
-      .sprite(100, 450, "thedude")
+      .sprite(100, 450, "vera")
       .setBounce(0.2)
-      .setCollideWorldBounds(true)
-      .setScale(1.5)
+      .setScale(0.73)
       .refreshBody();
 
+    this.camera = this.cameras.main;
     this.setupAnims();
 
     this.bombs = this.physics.add.group();
-
-    this.cursors = this.input.keyboard?.createCursorKeys();
-    this.wasd = this.input.keyboard?.addKeys("W,S,A,D");
-    this.physics.add.collider(this.player, this.platforms);
-    this.physics.add.collider(this.bombs, this.platforms);
-    this.physics.add.collider(this.squirrels, this.platforms);
-    this.physics.add.collider(this.player, this.bombs, this.hitBomb);
 
     this.bombs
       .create(400, 300, "bomb")
@@ -488,6 +542,30 @@ export class Game extends Scene {
       .setVelocity(Math.Between(-200, 200), 20);
 
     this.setupUI();
+
+    this.cursors = this.input.keyboard?.createCursorKeys();
+    this.wasd = this.input.keyboard?.addKeys("W,S,A,D");
+
+    // Run these after all other init
+    this.physics.add.collider(this.player, this.platforms);
+    this.physics.add.collider(
+      this.player,
+      this.jumpPlatform,
+      this.onJumpPlatform,
+    );
+    this.physics.add.collider(this.bombs, this.platforms);
+    this.physics.add.collider(this.tree, this.platforms);
+    this.physics.add.collider(this.squirrels, this.platforms);
+    this.physics.add.collider(this.player, this.bombs, this.hitBomb);
+    this.physics.add.collider(this.player, this.chest, this.hitChest);
+  }
+
+  onJumpPlatform(
+    player: Phaser.Physics.Arcade.Sprite,
+    _jumpPlatform: Phaser.Physics.Arcade.Sprite,
+  ) {
+    if (player.body?.blocked.down || player.body?.touching.down)
+      player.setVelocityY(-1500);
   }
 
   continueDialogue(): string | null {
@@ -610,15 +688,36 @@ export class Game extends Scene {
       this.cursors?.shift.isDown ||
       this.pad((p) => p.R1 > 0.5 || p.R2 > 0.5 || p.A);
 
+    // Camera follow
     this.camera.centerOnX(this.player.x);
     if (this.player.y % H) {
       this.camera.centerOnY(this.player.y);
     }
 
-    if (this.player.y > H * 2) {
+    if (this.player.y > H * 1.1) {
+      // Night mode
       this.statusText.setColor("#ff1964");
       this.dashBar.fillColor = 0xff1964;
+    } else {
+      this.statusText.setColor("#000000");
+      this.dashBar.fillColor = 0x000000;
     }
+
+    if (this.player.y > H * 6) {
+      // Reset
+      this.player.setPosition(100, 450);
+    }
+
+    if (
+      Math.Distance.Between(
+        this.player.x,
+        this.player.y,
+        this.ship.x,
+        this.ship.y,
+      ) < 270
+    )
+      this.ship.anims.play("ship-interior", true);
+    else this.ship.anims.play("ship-exterior", true);
 
     // Basic movement controls set velocity directly
     const canDash =
@@ -652,19 +751,30 @@ export class Game extends Scene {
     }
 
     const horizSpeed = isDashing ? playerConst.dashHoriz : playerConst.horiz;
+    const vertSpeed = playerConst.vert;
     if (lDown) {
       // 160 px/sec
       this.player.setVelocityX(-horizSpeed);
       // TODO smaller hitbox
       // TODO move slower, slower dash too
-      this.player.anims.play(dDown ? "leftDodge" : "left", true);
     } else if (rDown) {
       this.player.setVelocityX(horizSpeed);
-      this.player.anims.play(dDown ? "rightDodge" : "right", true);
     } else {
       this.player.setVelocityX(0);
-      this.player.anims.play(dDown ? "rightDodge" : "turn");
     }
+    if (!this.player.body?.touching.down) {
+      if ((this.player.body?.velocity.y || 0) > 0)
+        this.player.anims.play("fall", true);
+      else this.player.anims.play("jump", true);
+    } else if (this.player.body?.velocity.x == 0) {
+      this.player.anims.play(dDown ? "idleDodge" : "idle", true);
+    } else if (lDown) {
+      this.player.anims.play(dDown ? "rightDodge" : "right", true);
+    } else if (rDown) {
+      this.player.anims.play(dDown ? "rightDodge" : "right", true);
+    }
+    if (lDown) this.player.flipX = true;
+    if (rDown) this.player.flipX = false;
 
     if (sDown && (lDown || rDown) && canDash) {
       this.playerTimes.dash = this.time.now;
@@ -676,7 +786,7 @@ export class Game extends Scene {
       (this.player.body?.touching.down ||
         this.time.now - this.playerTimes.grounded < this.coyoteTime)
     ) {
-      this.player.setVelocityY(-430);
+      this.player.setVelocityY(-vertSpeed);
     }
     if (this.player.body?.touching.down) {
       this.playerTimes.grounded = this.time.now;
@@ -688,7 +798,7 @@ export class Game extends Scene {
       this.player.body?.velocity.y &&
       this.player.body?.velocity.y > 0
     ) {
-      this.player.setGravityY(600);
+      this.player.setGravityY(700);
     } else {
       this.player.setGravityY(300);
     }
@@ -742,8 +852,10 @@ export class Game extends Scene {
   }
 
   hitBomb(_a: any, _b: any) {
-    this.physics.pause();
-    this.player.setTint(0xff0000);
-    this.player.anims.play("turn");
+    this.physics?.pause();
+  }
+
+  hitChest(player, chest) {
+    console.log("Chest!");
   }
 }
