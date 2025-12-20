@@ -13,7 +13,7 @@ import {
 const heartEmoji = "❤︎";
 const [W, H] = [1024, 768];
 
-const DEV_MODE = true;
+const DEV_MODE = false;
 const PHI = 0.5 + 5 ** 0.5 * 0.5;
 // const MAX_DIALOGUE = ".......................".length; // for width 300*PHI
 // const MAX_DIALOGUE = "................................".length; // for width 400*PHI
@@ -151,7 +151,7 @@ export class Game extends Scene {
   }
 
   introText() {
-    const viewTime = DEV_MODE ? 0.3 : 3;
+    const viewTime = DEV_MODE ? 0.3 : 1;
     const transTime = DEV_MODE ? 1 : 4;
     const text = [
       this.add
@@ -529,7 +529,12 @@ export class Game extends Scene {
       .sprite(100, 450, "vera")
       .setBounce(0.2)
       .setScale(0.73)
+      .setAlpha(0.95)
       .refreshBody();
+    this.player.setSize(
+      (this.player.body?.width || 0) / 2,
+      this.player?.body.height,
+    );
 
     this.camera = this.cameras.main;
     this.setupAnims();
@@ -714,7 +719,7 @@ export class Game extends Scene {
         this.player.y,
         this.ship.x,
         this.ship.y,
-      ) < 270
+      ) < 290
     )
       this.ship.anims.play("ship-interior", true);
     else this.ship.anims.play("ship-exterior", true);
