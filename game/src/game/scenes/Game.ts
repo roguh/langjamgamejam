@@ -73,6 +73,7 @@ export class Game extends Scene {
   };
   public coyoteTime: number = 200; // milliseconds
   public cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
+  public wasd?: object;
 
   constructor() {
     super("Game");
@@ -451,6 +452,7 @@ export class Game extends Scene {
     this.bombs = this.physics.add.group();
 
     this.cursors = this.input.keyboard?.createCursorKeys();
+    this.wasd = this.input.keyboard?.addKeys("W,S,A,D");
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.bombs, this.platforms);
     this.physics.add.collider(this.squirrels, this.platforms);
@@ -496,7 +498,11 @@ export class Game extends Scene {
     return res;
   }
 
-  updateDialogue(yarnNodeName: string, obj: Phaser.GameObjects.GameObject) {
+  updateDialogue(
+    continueJustReleased: boolean,
+    yarnNodeName: string,
+    obj: Phaser.GameObjects.GameObject,
+  ) {
     let next;
     this.dialogueElements.map((e) => (e.alpha = 1));
     if (this.dialogueState !== "WaitingOnOptionSelection") {
@@ -505,7 +511,7 @@ export class Game extends Scene {
     this.dialogueBox.alpha = 0.65;
     const name = yarnNodeName;
 
-    if (this.cursors?.space && Input.Keyboard.JustUp(this.cursors?.space)) {
+    if (continueJustReleased) {
       if ((next = this.continueDialogue())) this.currentDialogue = next;
     }
     if (this.dialogueState === "Running") {
@@ -552,39 +558,33 @@ export class Game extends Scene {
     this.itemText.alpha = 0;
   }
 
-  update() {
-    this.squirrels.children.iterate((s) =>
-      s.anims.play(
-        { key: "squirrel-idle", frameRate: Math.Between(3, 8) },
-        true,
-      ),
-    );
-    const talkers = Object.entries(this.conversationalists).filter(
-      ([yarnNode, obj]) =>
-        Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y) <
-        playerConst.dialogueDistance,
-    );
-    if (talkers.length > 0) {
-      this.updateDialogue(...talkers[0]);
-    } else {
-      this.closeDialogue();
-    }
-    let nearbyItems = this.items.filter(
-      ({ obj }) =>
-        Math.Distance.Between(
-          this.player.x,
-          this.player.y,
-          obj.body?.position.x ?? -Infinity,
-          obj.body?.position.y ?? -Infinity,
-        ) < playerConst.itemDistance,
-    );
-    if (nearbyItems.length > 0) {
-      this.updateInventory(nearbyItems[0].text, nearbyItems[0].obj);
-    } else {
-      this.closeInventory();
-    }
-
-    // Although we've added a lot of code it should all be pretty readable.
+  pad(checker: (pad: Phaser.Input.Gamepad.Gamepad) => boolean) {
+    return (this.input?.gamepad?.gamepads.filter(checker) || []).length > 0;
+  }
+  updatePlayer() {
+    // WASD
+    const lDown =
+      this.cursors?.left.isDown ||
+      this.wasd?.A?.isDown ||
+      this.pad((p) => p.left);
+    const rDown =
+      this.cursors?.right.isDown ||
+      this.wasd?.D?.isDown ||
+      this.pad((p) => p.right);
+    const dDown =
+      this.cursors?.down.isDown ||
+      this.wasd?.S?.isDown ||
+      this.pad((p) => p.down);
+    const uDown =
+      this.cursors?.up.isDown ||
+      this.wasd?.W?.isDown ||
+      this.pad((p) => p.up || p.B || p.L1 > 0.5 || p.L2 > 0.5);
+    const uJustUp =
+      (this.cursors?.up && Input.Keyboard.JustUp(this.cursors?.up)) ||
+      (this.wasd?.W && Input.Keyboard.JustUp(this.wasd?.W));
+    const sDown =
+      this.cursors?.shift.isDown ||
+      this.pad((p) => p.R1 > 0.5 || p.R2 > 0.5 || p.A);
 
     this.camera.centerOnX(this.player.x);
     if (this.player.y % H) {
@@ -628,37 +628,27 @@ export class Game extends Scene {
     }
 
     const horizSpeed = isDashing ? playerConst.dashHoriz : playerConst.horiz;
-    if (this.cursors?.left.isDown) {
+    if (lDown) {
       // 160 px/sec
       this.player.setVelocityX(-horizSpeed);
       // TODO smaller hitbox
       // TODO move slower, slower dash too
-      this.player.anims.play(
-        this.cursors?.down.isDown ? "leftDodge" : "left",
-        true,
-      );
-    } else if (this.cursors?.right.isDown) {
+      this.player.anims.play(dDown ? "leftDodge" : "left", true);
+    } else if (rDown) {
       this.player.setVelocityX(horizSpeed);
-      this.player.anims.play(
-        this.cursors?.down.isDown ? "rightDodge" : "right",
-        true,
-      );
+      this.player.anims.play(dDown ? "rightDodge" : "right", true);
     } else {
       this.player.setVelocityX(0);
-      this.player.anims.play(this.cursors?.down.isDown ? "rightDodge" : "turn");
+      this.player.anims.play(dDown ? "rightDodge" : "turn");
     }
 
-    if (
-      this.cursors?.shift.isDown &&
-      (this.cursors?.left.isDown || this.cursors?.right.isDown) &&
-      canDash
-    ) {
+    if (sDown && (lDown || rDown) && canDash) {
       this.playerTimes.dash = this.time.now;
     }
 
     // Coyote Time: allow jumping even after falling off a platform
     if (
-      this.cursors?.up.isDown &&
+      uDown &&
       (this.player.body?.touching.down ||
         this.time.now - this.playerTimes.grounded < this.coyoteTime)
     ) {
@@ -679,11 +669,52 @@ export class Game extends Scene {
       this.player.setGravityY(300);
     }
     // Allow fine-grained jump height control by releasing up key early
-    if (this.cursors?.up && Input.Keyboard.JustUp(this.cursors?.up)) {
+    if (uJustUp) {
       if ((this.player.body?.velocity.y || 0) < 0) {
         this.player.setVelocityY(0);
       }
     }
+  }
+
+  update() {
+    const spaceJustUp =
+      (this.cursors?.space && Input.Keyboard.JustUp(this.cursors?.space)) ||
+      this.pad((p) => p.X || p.Y);
+    false;
+
+    this.squirrels.children.iterate((s) =>
+      s.anims.play(
+        { key: "squirrel-idle", frameRate: Math.Between(3, 8) },
+        true,
+      ),
+    );
+    const talkers = Object.entries(this.conversationalists).filter(
+      ([yarnNode, obj]) =>
+        Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y) <
+        playerConst.dialogueDistance,
+    );
+    if (talkers.length > 0) {
+      this.updateDialogue(spaceJustUp, ...talkers[0]);
+    } else {
+      this.closeDialogue();
+    }
+    let nearbyItems = this.items.filter(
+      ({ obj }) =>
+        Math.Distance.Between(
+          this.player.x,
+          this.player.y,
+          obj.body?.position.x ?? -Infinity,
+          obj.body?.position.y ?? -Infinity,
+        ) < playerConst.itemDistance,
+    );
+    if (nearbyItems.length > 0) {
+      this.updateInventory(nearbyItems[0].text, nearbyItems[0].obj);
+    } else {
+      this.closeInventory();
+    }
+
+    // Although we've added a lot of code it should all be pretty readable.
+    this.updatePlayer();
   }
 
   hitBomb(_a: any, _b: any) {

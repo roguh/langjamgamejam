@@ -433,6 +433,11 @@ pub fn set_var(vm: State, name: String, value: Operand) -> State {
   State(..vm, vars: vm.vars |> dict.insert(name, value))
 }
 
+// easier js interop for now...
+pub fn set_var_bool(vm: State, name: String, value: Bool) -> State {
+  State(..vm, vars: vm.vars |> dict.insert(name, VBool(value)))
+}
+
 pub fn choose(vm: State, index: Int) -> State {
   let choices = vm.say |> list.length
   case vm.state {

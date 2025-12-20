@@ -1,0 +1,20 @@
+pub type State {
+pub type ExecutionState {
+pub type Operand {
+pub type Instruction {
+pub fn print_op(op: Operand) {
+pub fn print_instr(i: Instruction) {
+pub fn null_vm() {
+pub fn compile_or_null(source, filename) {
+pub fn compile(source: String) -> Result(State, String) {
+pub fn test_run(vm: State, inputs: List(Int)) -> State {
+pub fn get_var(vm: State, name: String) -> Operand {
+pub fn set_var(vm: State, name: String, value: Operand) -> State {
+pub fn set_var_bool(vm: State, name: String, value: Bool) -> State {
+pub fn choose(vm: State, index: Int) -> State {
+pub fn continue(vm: State) -> State {
+pub fn goto_node(vm: State, new) -> State {
+pub fn needs_choice(vm: State) -> List(String) {
+pub fn needs_continue(vm: State) -> Bool {
+pub fn saying(vm: State) -> List(String) {
+ag pub src/lang/yarn/runner.gleam
