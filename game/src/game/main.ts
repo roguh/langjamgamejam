@@ -1,4 +1,4 @@
-import { Game as MainGame } from "./scenes/Game";
+import { Game as MainGame, DEBUG } from "./scenes/Game";
 import { AUTO, Game, Scale, Types } from "phaser";
 
 // Find out more information about the Game Config at:
@@ -18,8 +18,8 @@ const config: Types.Core.GameConfig = {
     default: "arcade",
     arcade: {
       gravity: { x: 0, y: 300 },
-      // debug: true,
-      // debugShowBody: true,
+      debug: DEBUG,
+      debugShowBody: DEBUG,
     },
   },
 };

@@ -10,17 +10,19 @@ import {
   // goto_node,
 } from "../../gleamjunk/glisten48/lang/yarn/runner";
 
+export const DEBUG = true;
+const debugLoc = [-270, 1957];
 const heartEmoji = "❤︎";
 const [W, H] = [1024, 768];
+const TILE_OFFSET_Y = 256; //yikes
 
 const [platW, platH] = [400, 32];
 const [spikeW, spikeH] = [200, 68];
 
-const DEV_MODE = true;
+const DEV_MODE = DEBUG;
 //const DEV_MODE = false;
 const PHI = 0.5 + 5 ** 0.5 * 0.5;
 // const MAX_DIALOGUE = ".......................".length; // for width 300*PHI
-// const MAX_DIALOGUE = "................................".length; // for width 400*PHI
 const MAX_DIALOGUE = ((W / 10) * 0.95) | 0; // for width 1024
 const MAX_CHOICES = 5;
 const EMPTY_DIALOGUE = null;
@@ -30,9 +32,9 @@ let game = null;
 
 const playerConst = {
   // Speed in px/sec
-  horiz: 260,
+  horiz: 360,
   dashHoriz: 550,
-  vert: 370,
+  vert: 500,
   // Durations in milliseconds
   dashDuration: 2000,
   restDuration: 3500,
@@ -62,7 +64,6 @@ export class Game extends Scene {
   public dialogueState: DialogueExecutionState;
   public dialogueVM: string[];
   public platforms: Phaser.Physics.Arcade.StaticGroup;
-  public jumpPlatform: Phaser.Physics.Arcade.StaticGroup;
   public spikes: Phaser.Physics.Arcade.StaticGroup;
   public bombs: Phaser.Physics.Arcade.Group;
   public dialogueElements: (
@@ -90,7 +91,7 @@ export class Game extends Scene {
   public canInteract: boolean = false;
   public player: Phaser.Physics.Arcade.Sprite;
   public foundSupplies: boolean = false;
-  public chest: Phaser.Physics.Arcade.Sprite;
+  public chests: Phaser.Physics.Arcade.Sprite[];
   public ship: Phaser.Physics.Arcade.Sprite;
   public tree: Phaser.Physics.Arcade.Sprite;
   public squirrels: Phaser.Physics.Arcade.Group;
@@ -134,9 +135,13 @@ export class Game extends Scene {
     this.load.setPath("assets");
 
     this.load.image("background", "bg.png");
+
+    this.load.image("maptiles", "sprites/maptiles.png");
+    this.load.tilemapTiledJSON("map", "map.json");
     // 400px,32px
     this.load.image("ground", "sprites/grassy_platform.png");
     this.load.image("spikes", "sprites/spikes.png");
+    this.load.image("halfspikes", "sprites/halfspikes.png");
     this.load.image("star", "star.png");
     this.load.image("bomb", "bomb.png");
     this.load.image("chest", "sprites/chest.png");
@@ -167,7 +172,7 @@ export class Game extends Scene {
 
   introText() {
     const viewTime = DEV_MODE ? 0.3 : 1;
-    const transTime = DEV_MODE ? 1 : 4;
+    const transTime = DEV_MODE ? 0.2 : 4;
     const text = [
       this.add
         .text(W / 2, H / 2, "Heat from Fire, Fire from Heat", {
@@ -225,37 +230,8 @@ export class Game extends Scene {
     this.spikes = this.physics.add.staticGroup();
     this.platforms = this.physics.add.staticGroup();
 
-    // Refresh required after scaling
-    this.platforms.create(600, platW, "ground");
-    this.platforms.create(50, 250, "ground");
-    this.platforms.create(750, 220, "ground");
-    this.platforms.create(400, 568, "ground").setScale(2).refreshBody();
-    this.platforms.create(1300, 568, "ground").setScale(2).refreshBody();
-    this.spikes.create(1300 - platW - spikeW / 4, 568 + spikeH / 2, "spikes");
-    this.platforms
-      .create(-600 - platW * 2, 568, "ground")
-      .setScale(3.2, 2)
-      .refreshBody();
-    const shipPlat = this.platforms
-      .create(-600, 568, "ground")
-      .setScale(2)
-      .refreshBody();
-    this.spikes.create(-600 + platW + spikeW / 2, 568 + spikeH / 2, "spikes");
-    const shipfloor = this.platforms.create(-600, 568 - 67, "ground");
-    shipfloor.alpha = 0;
-    const _shipwall = this.platforms.add(
-      this.add
-        .rectangle(-600 - 390, 568 - 67 - 125, 180, 250, 0x000000)
-        .setAlpha(0)
-        .setOrigin(0),
-    );
-    this.platforms.children.iterate((p) =>
-      // Fake 3D effect, top of platform is above player's feet
-      p.setSize(p.body?.width, (p?.body.height || 100) * 0.6),
-    );
-
     this.ship = this.physics.add
-      .staticSprite(shipPlat.x - 100, shipPlat.y - 168 + 48, "ship")
+      .staticSprite(-600 - 100, 568 - 168 + 48 + TILE_OFFSET_Y, "ship")
       .setScale(2);
 
     // Squirrels
@@ -290,17 +266,9 @@ export class Game extends Scene {
       .setScale(1.5)
       .refreshBody();
     mainSquirrel.flipX = true;
-    this.chest = this.physics.add
-      .staticSprite(680, 150, "chest")
-      .setOrigin(0)
-      .refreshBody();
-    this.items.push({
-      obj: this.chest,
-      text: "This chest contains the right materials to repair your engine.",
-    });
-
     this.conversationalists.SquirrelPriest = mainSquirrel;
     this.squirrels.children.iterate((obj) => {
+      obj.y += TILE_OFFSET_Y;
       if (obj === mainSquirrel) return null;
       this.items.push({
         obj,
@@ -312,6 +280,28 @@ export class Game extends Scene {
         ]),
       });
       return null;
+    });
+
+    const lastLoc = [-1570, 6277];
+    this.chests = [
+      this.physics.add
+        .staticSprite(680, 150 + TILE_OFFSET_Y, "chest")
+        .setOrigin(0)
+        .refreshBody(),
+      this.physics.add
+        .staticSprite(lastLoc[0], lastLoc[1] - 40, "chest")
+        .setScale(1.2)
+        .setFlipX(true)
+        .setOrigin(0)
+        .refreshBody(),
+    ];
+    this.items.push({
+      obj: this.chests[0],
+      text: "This chest contains the right materials to repair your engine.",
+    });
+    this.items.push({
+      obj: this.chests[1],
+      text: "This chest contains the remaining materials you need.",
     });
   }
 
@@ -517,47 +507,26 @@ export class Game extends Scene {
   }
 
   setupLowerLevel() {
-    this.add.rectangle(-W * 4, H, W * 8, H * 3, 0x205030).setOrigin(0);
-    this.platforms.add(
-      this.add
-        .rectangle(-W * 2, H * 2.9, W * 4, H * 0.2, 0x201410)
-        .setOrigin(0),
-    );
-    this.platforms.add(
-      this.add
-        .rectangle(-W * 2, H * 2.9, W * 4, H * 0.05, 0x102010)
-        .setOrigin(0),
-    );
-    this.platforms.add(
-      this.add.rectangle(-W * 2, H * 3.1, W * 4, H, 0x040602).setOrigin(0),
-    );
-    this.tree = this.physics.add.sprite(-W, H * 2, "tree");
-    this.tree.body.setSize(
-      this.tree.body?.width,
-      (this.tree?.body.height || 100) * 0.7,
-    );
+    this.tree = this.physics.add
+      .sprite(-W / 2, H * 2, "tree")
+      .setScale(0.5)
+      .refreshBody();
     this.conversationalists.Tree = this.tree;
-    this.jumpPlatform = this.physics.add.staticGroup();
-    this.jumpPlatform.add(
-      this.add
-        .rectangle(W * 0.8, H * 2.8, W / 2, H * 0.05, 0x882211)
-        .setOrigin(0),
-    );
 
     this.squirrels
-      .create(W * 0.4, H * 2.5, "squirrel")
+      .create(W * 0.4, H * 2.5 + TILE_OFFSET_Y, "squirrel")
       .setBounce(0.2)
       .setCollideWorldBounds(true)
       .setScale(2)
       .refreshBody();
     this.squirrels
-      .create(W * 0.5, H * 2.5, "squirrel")
+      .create(W * 0.5, H * 2.5 + TILE_OFFSET_Y, "squirrel")
       .setBounce(0.2)
       .setCollideWorldBounds(true)
       .setScale(2)
       .refreshBody();
     const squirrel2 = this.squirrels
-      .create(W * 0.7, H * 2.5, "squirrel")
+      .create(W * 0.7, H * 2.5 + TILE_OFFSET_Y, "squirrel")
       .setBounce(0.2)
       .setCollideWorldBounds(true)
       .setScale(4)
@@ -578,22 +547,34 @@ export class Game extends Scene {
 
   create() {
     // 512,384 is the center of the screen
-    this.add.tileSprite(512, 384 - H, W * 9, H, "background").setFlipY(true);
-    this.add.tileSprite(512, 384, W * 9, H, "background");
+    this.add
+      .tileSprite(512, 384 - H + TILE_OFFSET_Y, W * 9, H, "background")
+      .setFlipY(true);
+    this.add.tileSprite(512, 384 + TILE_OFFSET_Y, W * 9, H, "background");
+    this.add
+      .rectangle(-W * 4, H + TILE_OFFSET_Y, W * 8, H * 3, 0x205030)
+      .setOrigin(0);
+
+    const map = this.make.tilemap({ key: "map" });
+    const tiles = map.addTilesetImage("maptiles", "maptiles");
+    const tileLayer = map.createLayer(0, tiles, -W - 100 * 10, 75);
+    tileLayer?.setCollisionByProperty({ collides: true });
 
     this.introText();
-    this.physics.world.setBounds(-W * 2, 0, W * 4, H * 3);
+    this.physics.world.setBounds(-W * 2, 0, tileLayer.width, tileLayer.height);
 
     this.setupIntroLevel();
     this.setupLowerLevel();
     // The Dude abides
     this.player = this.physics.add
-      .sprite(100, 450, "vera")
+      .sprite(DEBUG ? debugLoc[0] : 100, DEBUG ? debugLoc[1] - 20 : 760, "vera")
+      //.sprite(-1300, 450, "vera")
       .setBounce(0.2)
       .setScale(0.73)
       .setAlpha(0.95)
       .setCollideWorldBounds(true)
       .refreshBody();
+    this.player.name = "player vera orion (sama)";
     this.player.setSize(
       (this.player.body?.width || 0) / 2,
       this.player?.body.height,
@@ -604,10 +585,12 @@ export class Game extends Scene {
 
     this.bombs = this.physics.add.group();
 
+    /*
     this.bombs
       .create(400, 300, "bomb")
       .setBounce(1)
       .setVelocity(Math.Between(-200, 200), 20);
+    */
 
     this.setupUI();
 
@@ -618,23 +601,37 @@ export class Game extends Scene {
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(
       this.player,
-      this.jumpPlatform,
-      this.onJumpPlatform,
+      this.bombs,
+      this.hitBomb,
+      null,
+      this,
     );
-    this.physics.add.collider(this.bombs, this.platforms);
-    this.physics.add.collider(this.tree, this.platforms);
-    this.physics.add.collider(this.squirrels, this.platforms);
-    this.physics.add.collider(this.player, this.bombs, this.hitBomb);
-    this.physics.add.collider(this.player, this.spikes, this.hitSpike);
-    this.physics.add.collider(this.player, this.chest, this.hitChest);
-  }
-
-  onJumpPlatform(
-    player: Phaser.Physics.Arcade.Sprite,
-    _jumpPlatform: Phaser.Physics.Arcade.Sprite,
-  ) {
-    if (player.body?.blocked.down || player.body?.touching.down)
-      player.setVelocityY(-1500);
+    this.physics.add.collider(
+      this.player,
+      this.spikes,
+      this.hitSpike,
+      null,
+      this,
+    );
+    if (DEBUG) {
+      const debugGraphics = this.add.graphics().setAlpha(0.5);
+      tileLayer.renderDebug(debugGraphics, {
+        tileColor: null, // Color of non-colliding tiles
+        collidingTileColor: new Phaser.Display.Color(243, 134, 48, 255), // Color of colliding tiles
+        faceColor: new Phaser.Display.Color(40, 39, 37, 255), // Color of colliding face edges
+      });
+    }
+    [this.player, this.squirrels, this.tree, this.bombs].map((sprite) => {
+      this.physics.add.collider(sprite, this.platforms);
+      tileLayer &&
+        this.physics.add.collider(
+          sprite,
+          tileLayer,
+          this.onTileCollision,
+          null,
+          this,
+        );
+    });
   }
 
   continueDialogue(): string | null {
@@ -731,11 +728,20 @@ export class Game extends Scene {
     this.descText.setText(wrap(text, 45));
 
     // hack
-    if (obj === this.chest) {
+    if (obj === this.chests[0]) {
       // set VM variable
       this.foundSupplies = true;
       this.vm = set_var_bool(this.vm, "$foundSupplies", true);
       console.log("Found supplies?", get_var(this.vm, "$foundSupplies")[0]);
+    }
+    if (obj === this.chests[1]) {
+      // set VM variable
+      this.foundSupplies = true;
+      this.vm = set_var_bool(this.vm, "$foundSupplies2", true);
+      console.log(
+        "Found more supplies?",
+        get_var(this.vm, "$foundSupplies2")[0],
+      );
     }
   }
   closeInventory() {
@@ -747,6 +753,9 @@ export class Game extends Scene {
     return (this.input?.gamepad?.gamepads.filter(checker) || []).length > 0;
   }
   updatePlayer() {
+    const onGround =
+      this.player.body?.touching.down || this.player?.tileCollide;
+
     // WASD
     const lDown =
       this.cursors?.left.isDown ||
@@ -792,11 +801,6 @@ export class Game extends Scene {
       this.canInteractText.setColor("#000000");
     }
 
-    if (this.player.y > H * 6) {
-      // Reset
-      this.player.setPosition(100, 450);
-    }
-
     if (
       Math.Distance.Between(
         this.player.x,
@@ -816,7 +820,8 @@ export class Game extends Scene {
       this.time.now - this.playerTimes.dash < playerConst.dashDuration;
 
     if (isDashing) {
-      this.dashBar.alpha = 1;
+      // TODO DASHING IS BROKEN DUE TO BAD TILE COLLISION
+      this.dashBar.alpha = 0;
       // TODO cleanup, use tweens?
       this.dashBar.width =
         ((1 -
@@ -825,7 +830,8 @@ export class Game extends Scene {
         PHI /
         2;
     } else if (!canDash) {
-      this.dashBar.alpha = 1;
+      // TODO DASHING IS BROKEN DUE TO BAD TILE COLLISION
+      this.dashBar.alpha = 0;
       this.dashBar.width =
         (2 *
           (-0.5 +
@@ -851,7 +857,7 @@ export class Game extends Scene {
     } else {
       this.player.setVelocityX(0);
     }
-    if (!this.player.body?.touching.down) {
+    if (!onGround) {
       if ((this.player.body?.velocity.y || 0) > 0)
         this.player.anims.play("fall", true);
       else this.player.anims.play("jump", true);
@@ -872,8 +878,7 @@ export class Game extends Scene {
     // Coyote Time: allow jumping even after falling off a platform
     if (
       uDown &&
-      (this.player.body?.touching.down ||
-        this.time.now - this.playerTimes.grounded < this.coyoteTime)
+      (onGround || this.time.now - this.playerTimes.grounded < this.coyoteTime)
     ) {
       this.player.setVelocityY(-vertSpeed);
     }
@@ -897,6 +902,7 @@ export class Game extends Scene {
         this.player.setVelocityY(0);
       }
     }
+    this.player.tileCollide = false;
   }
 
   update() {
@@ -982,12 +988,23 @@ export class Game extends Scene {
 
   hitBomb(_bomb: any, player: Phaser.GameObjects.Sprite) {
     _bomb.alpha = 0;
-    game.gameOver("You hit a bomb.");
+    this.gameOver("You hit a bomb.");
   }
 
   hitSpike(_a, _b) {
-    game.gameOver("You landed on a spike.");
+    this.gameOver("You landed on a spike.");
   }
 
-  hitChest(player, chest) {}
+  onTileCollision(obj, tile) {
+    if (obj === this.player) {
+      if (obj.y >= this.player.y) {
+        this.player.tileCollide = true;
+        if (tile?.properties?.jumpy === true) {
+          this.player.setVelocityY(-3800);
+        }
+      }
+    }
+    if (obj === this.player && tile?.properties?.kill === true)
+      this.gameOver("You landed on a spike.");
+  }
 }
