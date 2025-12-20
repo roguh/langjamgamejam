@@ -10,7 +10,7 @@ import {
   // goto_node,
 } from "../../gleamjunk/glisten48/lang/yarn/runner";
 
-export const DEBUG = true;
+export const DEBUG = false;
 const debugLoc = [-270, 1957];
 const heartEmoji = "❤︎";
 const [W, H] = [1024, 768];
@@ -134,6 +134,14 @@ export class Game extends Scene {
   preload() {
     this.load.setPath("assets");
 
+    this.load.audio("intro", [
+      "music/Silk Abbess (Promo Video) - Eymbr.ogg",
+      "music/Silk Abbess (Promo Video) - Eymbr.mp3",
+    ]);
+    this.load.audio("cave", [
+      "music/Eymbr - Eymbr VVytch- Black Tragedy - 06 Honor Of The Knight.ogg",
+      "music/Eymbr - Eymbr VVytch- Black Tragedy - 06 Honor Of The Knight.mp3",
+    ]);
     this.load.image("background", "bg.png");
 
     this.load.image("maptiles", "sprites/maptiles.png");
@@ -184,17 +192,12 @@ export class Game extends Scene {
         .setOrigin(0.5)
         .setDepth(100),
       this.add
-        .text(
-          W / 2,
-          H / 2 + 70,
-          "A narrative platformer made in the Mountain States\nNo generative AI",
-          {
-            fontFamily: "Arial Black",
-            fontSize: 27,
-            color: "#ff1964",
-            align: "center",
-          },
-        )
+        .text(W / 2, H / 2 + 70, "A narrative platformer.", {
+          fontFamily: "Arial Black",
+          fontSize: 27,
+          color: "#ff1964",
+          align: "center",
+        })
         .setOrigin(0.5)
         .setDepth(100),
       this.add.rectangle(W / 2, H / 2, W, H, 0x000000).setDepth(99),
@@ -371,7 +374,7 @@ export class Game extends Scene {
     this.statusText = this.add
       .text(32 * 1.5, 32 * 1.5, heartEmoji.repeat(5), {
         fontSize: "22px",
-        color: "#000",
+        color: "#ff1964",
       })
       .setOrigin(0)
       .setDepth(96);
@@ -410,7 +413,7 @@ export class Game extends Scene {
     this.gameoverText = this.add
       .text(W / 2, H / 2, "", {
         fontSize: "40px",
-        color: "#ffffff",
+        color: "#ff1964",
       })
       .setDepth(96)
       .setOrigin(0.5)
@@ -546,6 +549,8 @@ export class Game extends Scene {
   }
 
   create() {
+    this.sound.unlock();
+
     // 512,384 is the center of the screen
     this.add
       .tileSprite(512, 384 - H + TILE_OFFSET_Y, W * 9, H, "background")
@@ -632,6 +637,17 @@ export class Game extends Scene {
           this,
         );
     });
+
+    this.sound.pauseOnBlur = true;
+    const s = (this.intromusic = this.sound.add("intro", {
+      loop: true,
+      volume: 0.25,
+    }));
+    this.intromusic.play();
+    this.actionmusic = this.sound.add("cave", { loop: true, volume: 0.25 });
+    this.actionmusic.play();
+    this.actionmusic.pause();
+    console.log(this.actionmusic.isPaused, "ispaus");
   }
 
   continueDialogue(): string | null {
@@ -792,13 +808,15 @@ export class Game extends Scene {
 
     if (this.player.y > H * 1.3) {
       // Night mode
-      this.statusText.setColor("#fff");
       this.dashBar.fillColor = 0xffffff;
       this.canInteractText.setColor("#fff");
+      this.actionmusic.isPaused && this.actionmusic.play();
+      this.intromusic.pause();
     } else {
-      this.statusText.setColor("#000000");
       this.dashBar.fillColor = 0x000000;
-      this.canInteractText.setColor("#000000");
+      this.canInteractText.setColor("#ff1964");
+      //this.actionmusic.pause();
+      //this.intromusic.isPaused && this.intromusic.play();
     }
 
     if (
@@ -972,9 +990,11 @@ export class Game extends Scene {
   }
 
   gameOver(text: string) {
+    this.intromusic.stop();
+    this.actionmusic.stop();
     this.anims.pauseAll();
     this.gameoverText.setText("Game Over: " + text);
-    this.gameoverBack.alpha = 1;
+    this.gameoverBack.alpha = 0.65;
     this.gameover = true;
     this.time.addEvent({
       delay: 40,

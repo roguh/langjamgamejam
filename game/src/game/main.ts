@@ -17,6 +17,7 @@ const config: Types.Core.GameConfig = {
   physics: {
     default: "arcade",
     arcade: {
+      tileBias: 100,
       gravity: { x: 0, y: 300 },
       debug: DEBUG,
       debugShowBody: DEBUG,
