@@ -1,5 +1,6 @@
 //////////////////// AHHHHHHHHHHHHH  TODO COMPILE RIGHT
 //////////////////// AHHHHHHHHHHHHH  TODO COMPILE RIGHT
+/////////// PUBLIC API
 
 import gleam/dict.{type Dict}
 import gleam/float
@@ -12,7 +13,6 @@ import gleam/string
 import glearray.{type Array}
 import lang/yarn/ast
 import lang/yarn/parse
-
 
 pub type State {
   State(
@@ -86,7 +86,9 @@ pub fn print_op(op: Operand) {
   }
 }
 
-fn rand_id(){int.to_string(int.random(100_000_000))}
+fn rand_id() {
+  int.to_string(int.random(100_000_000))
+}
 
 fn nameify(name) {
   name |> option.map(fn(v) { v <> ": " }) |> option.unwrap("")
@@ -219,14 +221,13 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
       ast.Cmd(ast.Once(_, body_, _)) -> {
         let id = "$$once_" <> rand_id()
         let body = compile_(body_)
-        list.append([Get(id), 
-          Unary("!"),
-          JumpIfFalse(list.length(body) + 2),
-          ..body
-        ], [
-          Push(VBool(True)),
-          Set(id),
-        ])
+        list.append(
+          [Get(id), Unary("!"), JumpIfFalse(list.length(body) + 2), ..body],
+          [
+            Push(VBool(True)),
+            Set(id),
+          ],
+        )
       }
       ast.LineGroup(items) -> {
         let compiled_items =

@@ -1,5 +1,14 @@
 import { Math, Scene, Input } from "phaser";
 import { wrap } from "../utils";
+import {
+  compile_or_null,
+  needs_continue,
+  continue$,
+  set_var_bool,
+  get_var,
+  saying,
+  // goto_node,
+} from "../../gleamjunk/glisten48/lang/yarn/runner";
 
 const [W, H] = [1024, 768];
 
@@ -31,6 +40,13 @@ type DialogueExecutionState =
   | "WaitingOnOptionSelection"
   | "WaitingOnContinue"
   | "Running";
+
+function gleamList(a: any): string[] {
+  if (a?.head) {
+    return ["" + a.head].concat(gleamList(a?.tail));
+  }
+  return [];
+}
 
 export class Game extends Scene {
   public camera: Phaser.Cameras.Scene2D.Camera;
@@ -86,6 +102,14 @@ export class Game extends Scene {
     this.currentDialogue = INIT_DIALOGUE;
     this.items = [];
     this.conversationalists = {};
+
+    let vm = compile_or_null("title: Test\n---\na b c===\n");
+    console.log(needs_continue(vm));
+    vm = continue$(vm);
+    console.log(gleamList(saying(vm)).join("\n"));
+    vm = set_var_bool(vm, "$jstest", true);
+    console.log(get_var(vm, "$$$$$notexists"));
+    console.log(get_var(vm, "$jstest")[0]);
   }
 
   preload() {
