@@ -438,11 +438,17 @@ fn run_one_instr(vm, i: Instruction) {
       )
     Pop -> State(..vm, ip: vm.ip + 1, stack: vm |> rest)
     Dup -> State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> top))
-    Set(name) -> State(..vm |> set_var(name, vm |> top), ip: vm.ip + 1)
+    Set(name) ->
+      State(..vm |> set_var(name, vm |> top), ip: vm.ip + 1, stack: vm |> rest)
     Get(name) ->
       State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> get_var(name)))
-    Binary(op) ->
-      State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop2 |> bin(op)))
+    Binary(op) -> {
+      case vm.stack {
+        [a, b, ..rest] ->
+          State(..vm, ip: vm.ip + 1, stack: [bin(a, b, op), ..rest])
+        _ -> vm
+      }
+    }
     Unary(op) ->
       State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop |> un(op)))
     // skip over labels, no-ops
@@ -508,9 +514,7 @@ fn if_false(v: Operand, a, b) {
   }
 }
 
-fn bin(ab: #(Operand, Operand), op: String) -> Operand {
-  let a_ = ab.0
-  let b_ = ab.1
+fn bin(a_, b_, op: String) -> Operand {
   case op {
     "==" -> VBool(a_ == b_)
     "!=" -> VBool(a_ == b_)
@@ -593,7 +597,14 @@ pub fn choose(vm: State, index: Int) -> State {
 
 pub fn continue(vm: State) -> State {
   case vm.state {
-    WaitingOnContinue -> State(..vm, state: Running, say: []) |> next
+    WaitingOnContinue -> {
+      let n = State(..vm, state: Running, say: []) |> next
+      case n.state {
+        // keep the last thing said at end state
+        Stopped -> State(..n, say: vm.say)
+        _ -> n
+      }
+    }
     _ -> {
       echo "Warning! it is a no-op to continue in this state"
       echo vm.state
@@ -617,7 +628,13 @@ pub fn needs_choice(vm: State) -> List(String) {
   }
 }
 
-pub fn jump_to_node(vm: State, node: String) {
+pub fn jump_to_node(vm: State, node_: String) {
+  let node = node_
+
+  case vm.nodes |> dict.has_key(node) {
+    True -> echo "Warning! node does not exist"
+    _ -> ""
+  }
   State(..vm, node: node, say: [], stack: [], ip: 0, state: WaitingOnContinue)
 }
 

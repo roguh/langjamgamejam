@@ -226,15 +226,20 @@ export class Game extends Scene {
     this.ship = this.physics.add
       .staticSprite(-600 - 100, 568 - 168 + 48 + TILE_OFFSET_Y, "ship")
       .setScale(2);
+    this.conversationalists.Ship = this.ship;
 
     // ShipBookshelves
     // -596, 709
     // -512,709  seat
     // -704,709
     this.items.push({
-      obj: this.add.rectangle(-596, 709, 10, 10, 0xff0000).setAlpha(0.5),
+      obj: this.ship,
+      text: saying(continue$(jump_to_node(this.dialogue_vm, "Ship"))),
+    });
+    this.items.push({
+      obj: this.add.rectangle(-596, 709, 10, 10, 0xff0000).setAlpha(0.01),
       text: saying(
-        continue$(jump_to_node(this.dialogue_vm, "ShipBookshelves")),
+        continue$(jump_to_node(this.dialogue_vm, "Ship_Bookshelves")),
       ),
     });
 
@@ -247,7 +252,7 @@ export class Game extends Scene {
       .setScale(1.5)
       .setSize(40, 48);
     // TODO tutorial squirrel
-    this.conversationalists.RescueSquirrel = rescueSquirrel;
+    this.conversationalists.Secret_Squirrel = rescueSquirrel;
     this.squirrels
       .create(400, 350, "squirrel")
       .setBounce(0.2)
@@ -271,7 +276,7 @@ export class Game extends Scene {
       .setScale(1.5)
       .refreshBody();
     mainSquirrel.flipX = true;
-    this.conversationalists.SquirrelTreeHints = mainSquirrel;
+    this.conversationalists.Friendly_Squirrel = mainSquirrel;
     this.squirrels.children.iterate((obj) => {
       obj.y += TILE_OFFSET_Y;
       if (obj === mainSquirrel) return null;
@@ -538,7 +543,7 @@ export class Game extends Scene {
       .refreshBody();
     squirrel2.flipX = true;
 
-    this.conversationalists.SquirrelLowerLevel = squirrel2;
+    this.conversationalists.Big_Squirrel = squirrel2;
     this.squirrels.children.iterate((obj) => {
       if (obj === squirrel2 || this.items.map(({ obj }) => obj).includes(obj))
         return null;
@@ -559,7 +564,6 @@ export class Game extends Scene {
 
     this.init_vm = compile_or_null(this.cache.text.get("teststory"));
     this.dialogue_vm = this.init_vm;
-    console.log("saying", gleamList(saying(this.dialogue_vm)));
     this.dialogue_vm = set_var_bool(this.dialogue_vm, "$test_from_js", true);
     console.log("get test", get_var(this.dialogue_vm, "$test_from_js"));
     console.log(
@@ -682,6 +686,7 @@ export class Game extends Scene {
     let next;
 
     if (current_node(this.dialogue_vm) != yarnNodeName) {
+      console.log("going to", yarnNodeName);
       this.dialogue_vm = jump_to_node(this.dialogue_vm, yarnNodeName);
     }
 
@@ -704,13 +709,17 @@ export class Game extends Scene {
       );
     }
     this.dialogueBox.alpha = 0.65;
-    const name = yarnNodeName;
+    const name = (yarnNodeName || "").replace(/_/g, " ");
 
-    const currentDialogue =
-      presentingOptions.length === 0 ? saying(this.dialogue_vm) : "";
     if (continueJustReleased) {
       this.dialogue_vm = continue$(this.dialogue_vm);
+      if (saying(this.dialogue_vm) === "") {
+        this.dialogue_vm = continue$(this.dialogue_vm);
+      }
     }
+    const currentDialogue =
+      presentingOptions.length === 0 ? saying(this.dialogue_vm) : "";
+
     const justChose = Object.entries(choices)
       .filter(([ix, val]) => val)
       .map(([ix, _]) => ix);
@@ -954,27 +963,26 @@ export class Game extends Scene {
       ),
     );
     const talkers = Object.entries(this.conversationalists).filter(
-      ([yarnNode, obj]) =>
+      ([_, obj]) =>
         Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y) <
         (obj.width > playerConst.dialogueDistance
           ? obj.width / 2
           : playerConst.dialogueDistance),
     );
     if (talkers.length > 0 && talkers.length > 0 && this.isInteracting) {
-      this.lastNode = talkers[0];
+      this.lastNode = talkers[0][0];
       this.updateDialogue(spaceJustUp, choices, ...talkers[0]);
     } else {
       this.closeDialogue();
     }
-    let nearbyItems = this.items.filter(
-      ({ obj }) =>
-        Math.Distance.Between(
-          this.player.x,
-          this.player.y,
-          obj.body?.position.x ?? -Infinity,
-          obj.body?.position.y ?? -Infinity,
-        ) < playerConst.itemDistance,
-    );
+    let nearbyItems = this.items.filter(({ obj }) => {
+      const [x, y] = [
+        obj.body?.position.x ?? obj?.getCenter().x ?? -Infinity,
+        obj.body?.position.y ?? obj?.getCenter().y ?? -Infinity,
+      ];
+      return Math.Distance.Between(this.player.x, this.player.y)<obj.width>;
+      playerConst.itemDistance ? obj.width / 2 : playerConst.itemDistance;
+    });
 
     // Messy UI code!
     if (nearbyItems.length > 0 && talkers.length === 0 && this.isInteracting) {
@@ -993,7 +1001,8 @@ export class Game extends Scene {
       this.canInteractText.setText("");
     }
     if (!nearInteractive) {
-      if (this.lastNode)
+      if (this.lastNode && current_node(this.dialogue_vm) !== this.lastNode)
+        // restart dialogue after leaving
         this.dialogue_vm = jump_to_node(this.dialogue_vm, this.lastNode);
       this.isInteracting = false;
     }
