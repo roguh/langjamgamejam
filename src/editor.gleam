@@ -181,7 +181,7 @@ fn view(model: Model) -> Element(Event) {
 }
 
 fn init(_args) -> Model {
-  let t = "/tests/once.yarn"
+  let t = "/tests/beginner.yarn"
   let foxnews = ["She is", "He is", "They are"]
   let cat_is = case list.sample(foxnews, 1) {
     [n] -> n

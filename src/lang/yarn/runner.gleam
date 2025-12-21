@@ -21,11 +21,11 @@ pub type State {
     node: String,
     ip: Int,
     stack: List(Operand),
+    jump_table: Dict(String, Int),
+    // Each label shoulld be globally unique, Int is the instruction pointer within a node
     nodes: Dict(String, Array(Instruction)),
     init: Dict(String, Operand),
     vars: Dict(String, Operand),
-    // This comes from the user
-    choice: Int,
     // This is given to the user
     // It is either a list of dialogue, or a list of choices depending on the exec state
     say: List(String),
@@ -49,6 +49,8 @@ pub type Operand {
 }
 
 pub type Instruction {
+  // Labels are converted to instruction pointers and added to jump table
+  Label(String)
   Return
   // Go to another node
   JumpNode(node_name: String)
@@ -56,6 +58,8 @@ pub type Instruction {
   Jump(instr_offset: Int)
   // Conditional jump
   JumpIfFalse(instr_offset: Int)
+  JumpLabel(label: String)
+  JumpLabelIfFalse(label: String)
   // Data jump: jump to number on top of stack
   JumpToTop
   // Pop from the stack and set this variable
@@ -67,10 +71,12 @@ pub type Instruction {
   Unary(String)
   Push(Operand)
   Pop
+  Dup
   // Stop execution
   Halt
   // Show text to the player
   ISay(Option(String))
+  // Pop N strings from stack and show as a list to player, possibly as a list of choices
   ISayn(Int)
   IWaitChoice
   IWaitContinue
@@ -94,34 +100,53 @@ fn nameify(name) {
   name |> option.map(fn(v) { v <> ": " }) |> option.unwrap("")
 }
 
-pub fn print_instr(i: Instruction) {
-  let s = int.to_string
-  case i {
-    Return -> "Return"
-    JumpNode(node_name) -> "JumpNode(" <> node_name <> ")"
-    JumpIfFalse(instr_offset) -> "JumpIfFalse(" <> instr_offset |> s <> ")"
-    JumpToTop -> "JumpToTop"
-    Jump(instr_offset) -> "Jump(" <> instr_offset |> s <> ")"
-    Set(var_name) -> "Set(" <> var_name <> ")"
-    Get(var_name) -> "Get(" <> var_name <> ")"
-    Push(operand) -> "Push(" <> operand |> print_op <> ")"
-    Pop -> "Pop"
-    Halt -> "Halt"
-    ISay(name) -> "ISay(" <> nameify(name) <> ")"
-    ISayn(n) -> "ISayn(" <> n |> s <> ")"
-    IWaitContinue -> "IWaitContinue"
-    IWaitChoice -> "IWaitChoice"
-    Binary(op) -> "Binary(" <> op <> ")"
-    Unary(op) -> "Unary(" <> op <> ")"
+pub fn print_instrs(instrs: Array(Instruction), jump_table: Dict(String, Int)) {
+  let get_label = fn(l) {
+    jump_table
+    |> dict.get(l)
+    |> result.map(int.to_string)
+    |> result.unwrap("unknown!")
   }
+
+  let s = int.to_string
+  instrs
+  |> glearray.to_list
+  |> list.index_map(fn(i, index) {
+    index |> int.to_string
+    <> ": "
+    <> case i {
+      Return -> "Return"
+      JumpNode(node_name) -> "JumpNode(" <> node_name <> ")"
+      JumpIfFalse(instr_offset) -> "JumpIfFalse(" <> instr_offset |> s <> ")"
+      Jump(instr_offset) -> "Jump(" <> instr_offset |> s <> ")"
+      JumpToTop -> "JumpToTop"
+      JumpLabelIfFalse(label) ->
+        "JumpIfFalse(" <> label <> ", " <> get_label(label) <> ")"
+      JumpLabel(label) -> "Jump(" <> label <> ", " <> get_label(label) <> ")"
+      Label(label) -> "Label(" <> label <> ", " <> get_label(label) <> ")"
+      Set(var_name) -> "Set(" <> var_name <> ")"
+      Get(var_name) -> "Get(" <> var_name <> ")"
+      Push(operand) -> "Push(" <> operand |> print_op <> ")"
+      Pop -> "Pop"
+      Dup -> "Dup"
+      Halt -> "Halt"
+      ISay(name) -> "ISay(" <> nameify(name) <> ")"
+      ISayn(n) -> "ISayn(" <> n |> s <> ")"
+      IWaitContinue -> "IWaitContinue"
+      IWaitChoice -> "IWaitChoice"
+      Binary(op) -> "Binary(" <> op <> ")"
+      Unary(op) -> "Unary(" <> op <> ")"
+    }
+  })
+  |> string.join("\n")
 }
 
 pub fn null_vm() {
   State(
     state: Stopped,
     ip: 0,
-    choice: -1,
     say: [],
+    jump_table: dict.from_list([]),
     init: dict.from_list([]),
     vars: dict.from_list([]),
     stack: [],
@@ -179,16 +204,64 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
     case b_ {
       ast.Line(content, name, _tags) ->
         list.append(compile_line(content), [ISay(name), IWaitContinue])
-      ast.Choice(cs) ->
-        cs
-        |> list.map(fn(c) {
-          // eeeeeeeeeeeeeeeeeeeeeeeeeeek
-          list.append(compile_line(c.content), [
-            ISayn(list.length(cs)),
-            IWaitChoice,
-          ])
-        })
-        |> list.flatten
+      ast.Choice(cs) -> {
+        let endlabel = "endchoice_" <> rand_id()
+        let choicelabels =
+          cs
+          |> list.index_map(fn(_v, index) {
+            #(index, "choice_" <> index |> int.to_string <> "_" <> rand_id())
+          })
+          |> dict.from_list
+        let lbl = fn(i) {
+          choicelabels
+          |> dict.get(i)
+          |> result.unwrap("")
+        }
+
+        list.append(
+          list.append(
+            list.append(
+              list.append(
+                //4 appends????? let's go!!!
+                cs
+                  |> list.map(fn(c) { c.content |> compile_line })
+                  |> list.flatten,
+                [
+                  // /
+                  // Present the user N strings from the stack
+                  ISayn(cs |> list.length),
+                  // Wait for the user to choose an option and leave choice on stack
+                  // one int->str  "0" "1" "2" "3" on top
+                  IWaitChoice,
+                ],
+              ),
+              cs
+                |> list.index_map(fn(_, index) {
+                  // Now Jump!
+                  // TODO faster jump selection...
+                  [
+                    Dup,
+                    Push(VString(index |> int.to_string)),
+                    Binary("!="),
+                    JumpLabelIfFalse(index |> lbl),
+                  ]
+                })
+                |> list.flatten,
+            ),
+            cs
+              |> list.index_map(fn(c, index) {
+                // Run contents then jump to end of this choice to skip over all other choices
+                // TODO fallthrough for last choice
+                list.append([Label(index |> lbl), ..c.next |> compile_], [
+                  JumpLabel(endlabel),
+                ])
+              })
+              |> list.flatten,
+          ),
+          [Label(endlabel)],
+        )
+      }
+
       ast.Cmd(ast.Jump(node_name)) -> [JumpNode(node_name)]
       ast.Cmd(ast.Stop) -> [Halt]
       ast.Cmd(ast.Decl(name, expr)) ->
@@ -263,17 +336,35 @@ pub fn compile(source: String) -> Result(State, String) {
     "Error at line " <> int.to_string(e.line) <> ": " <> e.error
   })
   |> result.map(fn(y) {
+    let ns =
+      y.nodes
+      |> list.map(fn(n) { #(n.title, n.body |> compile_) })
+    let jump_table =
+      ns
+      |> list.map(fn(kv) {
+        kv.1
+        |> list.index_map(fn(instr, i) {
+          case instr {
+            Label(name) -> #(name, i)
+            // Label X is at integer I in this node's instructions :)
+            _ -> #("", 0)
+            // lol hack
+          }
+        })
+      })
+      |> list.flatten
+      |> dict.from_list
+
     State(
       ..null_vm(),
+      jump_table: jump_table,
       state: WaitingOnContinue,
       node: y.nodes
         |> list.first
         |> result.map(fn(n) { n.title })
         |> result.unwrap(""),
-      nodes: y.nodes
-        |> list.map(fn(n) {
-          #(n.title, n.body |> compile_ |> glearray.from_list)
-        })
+      nodes: ns
+        |> list.map(fn(kv) { #(kv.0, kv.1 |> glearray.from_list) })
         |> dict.from_list,
     )
   })
@@ -328,15 +419,25 @@ fn run_one_instr(vm, i: Instruction) {
   case i {
     Push(op) -> State(..vm, ip: vm.ip + 1, stack: vm |> push(op))
     ISay(name) ->
-      State(..vm, ip: vm.ip + 1, say: [
-        nameify(name) <> vm |> top |> print_op,
-        ..vm.say
-      ])
+      State(
+        ..vm,
+        ip: vm.ip + 1,
+        say: [nameify(name) <> vm |> top |> print_op, ..vm.say],
+        stack: vm |> rest,
+      )
     IWaitContinue -> State(..vm, ip: vm.ip + 1, state: WaitingOnContinue)
     IWaitChoice -> State(..vm, ip: vm.ip + 1, state: WaitingOnChoice)
     // Pop N values, convert to strings
-    ISayn(n) -> State(..vm, ip: vm.ip + 1, say: ["pick me", "or pick me"])
+    ISayn(n) ->
+      State(
+        ..vm,
+        ip: vm.ip + 1,
+        say: // Pop n values from stack and convert to strings
+          vm.stack |> list.take(n) |> list.map(print_op),
+        stack: vm.stack |> list.drop(n),
+      )
     Pop -> State(..vm, ip: vm.ip + 1, stack: vm |> rest)
+    Dup -> State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> top))
     Set(name) -> State(..vm |> set_var(name, vm |> top), ip: vm.ip + 1)
     Get(name) ->
       State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> get_var(name)))
@@ -344,12 +445,36 @@ fn run_one_instr(vm, i: Instruction) {
       State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop2 |> bin(op)))
     Unary(op) ->
       State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop |> un(op)))
+    // skip over labels, no-ops
+    Label(_) -> State(..vm, ip: vm.ip + 1)
+    JumpLabel(s) ->
+      State(..vm, ip: vm.jump_table |> dict.get(s) |> result.unwrap(vm.ip + 1))
+    JumpLabelIfFalse(s) ->
+      State(
+        ..vm,
+        ip: if_false(
+          vm |> top,
+          // no-op if bad label
+          // no-op if top is false
+          {
+            let i = vm.jump_table |> dict.get(s) |> result.unwrap(0)
+            echo vm.nodes
+              |> dict.get(vm.node)
+              |> result.map(fn(n) { #(n, n |> glearray.get(i)) })
+            i
+          },
+          vm.ip + 1,
+        ),
+        stack: vm |> rest,
+      )
     Jump(offset) -> State(..vm, ip: vm.ip + offset)
     JumpToTop ->
       State(..vm, ip: vm.ip + int_or(vm |> pop, 1), stack: vm |> rest)
     JumpIfFalse(offset) ->
-      State(..vm, ip: vm.ip + if_false(vm |> top, offset, 1))
-    JumpNode(n) -> State(..vm, node: n)
+      // pop and change IP
+      State(..vm, ip: vm.ip + if_false(vm |> top, offset, 1), stack: vm |> rest)
+    JumpNode(n) ->
+      State(..vm, node: n, say: [], stack: [], ip: 0, state: Running)
     Halt -> State(..vm, state: Stopped)
     Return -> todo as "runner return unimplemented"
   }
@@ -388,6 +513,7 @@ fn bin(ab: #(Operand, Operand), op: String) -> Operand {
   let b_ = ab.1
   case op {
     "==" -> VBool(a_ == b_)
+    "!=" -> VBool(a_ == b_)
     ">" ->
       case a_, b_ {
         VFloat(a), VFloat(b) -> VBool(b >. a)
@@ -443,13 +569,19 @@ pub fn choose(vm: State, index: Int) -> State {
   let choices = vm.say |> list.length
   case vm.state {
     WaitingOnChoice ->
-      State(..vm, choice: index, state: case index {
+      case index {
         i if i < 0 || i >= choices -> {
           echo "Warning! choice index out of bounds"
-          WaitingOnChoice
+          vm
         }
-        _ -> Running
-      })
+        _ ->
+          State(
+            ..vm,
+            state: WaitingOnContinue,
+            say: [],
+            stack: vm |> push(echo VString(index |> int.to_string)),
+          )
+      }
     _ -> {
       echo "Warning! it is a no-op to choose in this state"
       echo vm.state
@@ -460,7 +592,7 @@ pub fn choose(vm: State, index: Int) -> State {
 
 pub fn continue(vm: State) -> State {
   case vm.state {
-    WaitingOnContinue -> State(..vm, state: Running) |> next
+    WaitingOnContinue -> State(..vm, state: Running, say: []) |> next
     _ -> {
       echo "Warning! it is a no-op to continue in this state"
       echo vm.state
@@ -470,7 +602,7 @@ pub fn continue(vm: State) -> State {
 }
 
 pub fn goto_node(vm: State, new) -> State {
-  State(..vm, node: new, ip: 0, state: WaitingOnContinue, choice: -1, say: [])
+  State(..vm, node: new, ip: 0, state: WaitingOnContinue, say: [])
 }
 
 pub fn needs_choice(vm: State) -> List(String) {

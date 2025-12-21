@@ -86,27 +86,27 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
       ],
       [
         // TODO only show ONE control at a time, choose/continue/stopped
-        // keyed.ol(
-        //   [],
-        //   vm
-        //     |> runner.needs_choice
-        //     |> list.index_map(fn(c, i) {
-        //       let si = int.to_string(i)
-        //       #(
-        //         si,
-        //         html.li([event.on_click(on_choice(i))], [
-        //           html.text("Option " <> si),
-        //           html.text(c),
-        //         ]),
-        //       )
-        //     }),
-        // ),
+        keyed.ol(
+          [],
+          vm
+            |> runner.needs_choice
+            |> list.index_map(fn(c, i) {
+              let si = int.to_string(i)
+              #(
+                si,
+                html.li([event.on_click(on_choice(i))], [
+                  html.text("Select " <> si <> ": "),
+                  html.text(c),
+                ]),
+              )
+            }),
+        ),
         q(
           vm |> runner.needs_continue,
           html.button([event.on_click(on_continue)], [
-            html.text(case vm.say {
-              [] -> ">>> Start story"
-              _ -> "> Continue"
+            html.text(case vm.say, vm.ip, vm.stack {
+              [], 0, [] -> ">>> Start story"
+              _, _, _ -> "> Continue"
             }),
           ]),
           html.text(""),
@@ -118,6 +118,10 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
             ])
           _ -> html.text("")
         },
+        html.div([], [
+          html.text("Stack: "),
+          html.text(vm.stack |> list.map(runner.print_op) |> string.join(", ")),
+        ]),
         html.div(
           [],
           vm.vars
@@ -162,9 +166,7 @@ pub fn view_instructions(vm: runner.State) {
       <> kv.0
       <> "\n"
       <> kv.1
-      |> glearray.to_list
-      |> list.map(runner.print_instr)
-      |> string.join("\n")
+      |> runner.print_instrs(vm.jump_table)
     })
     |> string.join("\n\n"),
   )
