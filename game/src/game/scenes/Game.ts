@@ -111,7 +111,7 @@ export class Game extends Scene {
   // TODO: Use Yarn VM to get dialogue and use object's ID as the Node name
   public items: { text: string; obj: Phaser.GameObjects.GameObject }[] = [];
   // This is the dialogue VM
-  public dialogue_vm: object;
+  public dialogue_vm: object; //TODO Gleam types
   // This is a fresh dialogue VM useful during game resets
   public init_vm: object;
 
@@ -498,7 +498,7 @@ export class Game extends Scene {
           .rectangle(
             64 * PHI + 32,
             H - dialogueH - 64 - 32 * i - 16,
-            W / PHI,
+            W,
             32 * 0.98,
             0xff1964,
           )
@@ -760,16 +760,23 @@ export class Game extends Scene {
     if (obj === this.chests[0]) {
       // set VM variable
       this.foundSupplies = true;
-      this.vm = set_var_bool(this.vm, "$foundSupplies", true);
-      console.log("Found supplies?", get_var(this.vm, "$foundSupplies")[0]);
+      this.dialogue_vm = set_var_bool(this.dialogue_vm, "$foundSupplies", true);
+      console.log(
+        "Found supplies?",
+        get_var(this.dialogue_vm, "$foundSupplies")[0],
+      );
     }
     if (obj === this.chests[1]) {
       // set VM variable
       this.foundSupplies = true;
-      this.vm = set_var_bool(this.vm, "$foundSupplies2", true);
+      this.dialogue_vm = set_var_bool(
+        this.dialogue_vm,
+        "$foundSupplies2",
+        true,
+      );
       console.log(
         "Found more supplies?",
-        get_var(this.vm, "$foundSupplies2")[0],
+        get_var(this.dialogue_vm, "$foundSupplies2")[0],
       );
     }
   }
@@ -782,6 +789,12 @@ export class Game extends Scene {
     return (this.input?.gamepad?.gamepads.filter(checker) || []).length > 0;
   }
   updatePlayer() {
+    if (get_var(this.dialogue_vm, "$ending_vera_dies")[0] === true) {
+      this.gameOver("The tree has consumed you.");
+    }
+    if (get_var(this.dialogue_vm, "$ending_vera_enlightened")[0] === true) {
+      this.gameOver("You have found enlightenment.");
+    }
     const onGround =
       this.player.body?.touching.down || this.player?.tileCollide;
 
@@ -823,8 +836,15 @@ export class Game extends Scene {
       // Night mode
       this.dashBar.fillColor = 0xffffff;
       this.canInteractText.setColor("#fff");
-      this.actionmusic.isPaused && this.actionmusic.play();
       this.intromusic.pause();
+      this.actionmusic.isPaused &&
+        this.time.addEvent({
+          delay: 2000,
+          callbackScope: this,
+          callback: function () {
+            this.actionmusic.isPaused && this.actionmusic.play();
+          },
+        });
     } else {
       this.dashBar.fillColor = 0x000000;
       this.canInteractText.setColor("#ff1964");
@@ -965,7 +985,7 @@ export class Game extends Scene {
     const talkers = Object.entries(this.conversationalists).filter(
       ([_, obj]) =>
         Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y) <
-        (obj.width > playerConst.dialogueDistance
+        (obj.width && obj.width / 2 > playerConst.dialogueDistance
           ? obj.width / 2
           : playerConst.dialogueDistance),
     );
@@ -1012,7 +1032,7 @@ export class Game extends Scene {
   }
 
   restart() {
-    this.vm = this.init_vm;
+    this.dialogue_vm = this.init_vm;
     this.gameover = false;
     this.anims.resumeAll();
     this.scene.restart();

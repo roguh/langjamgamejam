@@ -72,7 +72,10 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
     ]),
     html.div(
       [y("margin", "1em 0"), y("min-height", "15vh")],
-      vm.say |> list.reverse |> list.map(p),
+      case runner.needs_choice(vm) {
+        [] -> vm.say |> list.reverse |> list.map(p)
+        _ -> []
+      },
     ),
     html.div(
       [
@@ -94,10 +97,18 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
               let si = int.to_string(i)
               #(
                 si,
-                html.li([event.on_click(on_choice(i))], [
-                  html.text("Select " <> si <> ": "),
-                  html.text(c),
-                ]),
+                html.li(
+                  [
+                    y("background-color", "var(--pico-primary-background)"),
+                    y("border-radius", "5px"),
+                    y("padding", "0.5em"),
+                    event.on_click(on_choice(i)),
+                  ],
+                  [
+                    html.text("Select " <> si <> ": "),
+                    html.text(c),
+                  ],
+                ),
               )
             }),
         ),

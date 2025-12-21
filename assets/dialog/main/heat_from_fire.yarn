@@ -38,12 +38,6 @@ A voice in Vera's Mind: The presence I have felt has been you.
   A voice: I do not require to show myself as you've seen me already.}
 <<endonce>>
 
-<<if $tree_galaxy_mentioned>>
--> The galaxy? What do you mean?
- {Tree: My presence has existed for eons.
-  Tree: I know who and what you are, Vera.}
-<<endif>>
-
 <<once>>
 -> How do you know my name? Who are you?
  {Tree: I am known by many names. All of which have now been lost to time.
@@ -59,21 +53,31 @@ A voice in Vera's Mind: The presence I have felt has been you.
 <<endonce>>
 
 <<once>>
--> You know nothing of my past.
- {Tree: I know everything.
-  Tree: Your desire yo please your father but always falling short.
-  Tree: Your broken heart from the fracturing of your family.
-  Tree: The pain you carry for being born as someone who you are not.
-  Tree: You radiate your strife like warmth from the sun.}
--> How could you possibly know who I am?
- {Tree: Your very soul resonates here, my girl.
-  Tree: No matter how one was born, it is their soul that holds their identity.
-  Tree: You're destined for something grander, but you waste your time seeking the dead.}
--> I am not some book you can read. What makes you think I would listen to you?
+<<if $tree_galaxy_mentioned>>
+-> The galaxy? What do you mean?
+ {Tree: My presence has existed for eons.
+  Tree: I know who and what you are, Vera.}
+<<endif>>
+<<endonce>>
+
+<<once>>
+-> Silence! You know nothing of my past.
  {Tree: You will listen.
   Tree: Not with your ears, but your soul.
   Tree: It knows the truth, like it always has.
   Tree: Your birth didn't define who you are, and so your soul will lead you to the truth.}
+-> How could you possibly know who I am?
+ {Tree: Your very soul resonates here, my girl.
+  Tree: No matter how one was born, it is their soul that holds their identity.
+  Tree: You're destined for something grander, but you waste your time seeking the dead.}
+-> I am not some book you can read.
+// TODO comment within dialogue line broken
+// What makes you think I would listen to you?
+ {Tree: I know everything.
+  Tree: Your desire to please your father but always falling short.
+  Tree: Your broken heart from the fracturing of your family.
+  Tree: The pain you carry for being born as someone who you are not.
+  Tree: You radiate your strife like warmth from the sun.}
 <<endonce>>
 
 Then what must I do?
@@ -92,7 +96,6 @@ Tree: Your grief is the only thing holding you hostage now.
   {*The tree goes dim leaving Vera alone in the jungle.}
 -> You're right. I must let go.
   {Tree: As all things die, all things live.
-  *A bright light consumes Vera.
   <<set $ending_vera_enlightened to true>>
   <<set $ending_screen_color to "white">>}
 ===
