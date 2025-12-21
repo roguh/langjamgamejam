@@ -2,6 +2,7 @@ import { Math, Scene, Input } from "phaser";
 import { wrap } from "../utils";
 import {
   compile_or_null,
+  compile_error,
   needs_continue,
   needs_choice_arr,
   continue$,
@@ -123,7 +124,7 @@ export class Game extends Scene {
   preload() {
     this.load.setPath("assets");
 
-    this.load.text("teststory", "dialog/main/heat_from_fire.yarn");
+    this.load.text("mainstory", "dialog/main/heat_from_fire.yarn");
     this.load.audio("intro", [
       "music/Silk Abbess (Promo Video) - Eymbr.ogg",
       "music/Silk Abbess (Promo Video) - Eymbr.mp3",
@@ -406,7 +407,7 @@ export class Game extends Scene {
       .setOrigin(0.5)
       .setScrollFactor(0);
     this.canInteractText = this.add
-      .text(W / 2, H / 2 - this.player.displayHeight + 32, "", {
+      .text(W / 2, H / 2 - 110 + 32, "", {
         fontSize: "22px",
         color: "#000",
       })
@@ -562,15 +563,6 @@ export class Game extends Scene {
     // idk why this
     this.sound.unlock();
 
-    this.init_vm = compile_or_null(this.cache.text.get("teststory"));
-    this.dialogue_vm = this.init_vm;
-    this.dialogue_vm = set_var_bool(this.dialogue_vm, "$test_from_js", true);
-    console.log("get test", get_var(this.dialogue_vm, "$test_from_js"));
-    console.log(
-      "get test dne",
-      get_var(this.dialogue_vm, "$$$$$var_not_exists_test"),
-    );
-
     // 512,384 is the center of the screen
     this.add
       .tileSprite(512, 384 - H + TILE_OFFSET_Y, W * 9, H, "background")
@@ -587,6 +579,25 @@ export class Game extends Scene {
 
     this.introText();
     this.physics.world.setBounds(-W * 2, 0, tileLayer.width, tileLayer.height);
+
+    // for funny compile-error game over
+    this.setupUI();
+
+    const error: string = compile_error(this.cache.text.get("mainstory"));
+    // TODO log errors
+    if (error) {
+      console.log("Error compiling", error);
+      this.gameOver("COMPILATION ERROR", 5000);
+      return;
+    }
+    this.init_vm = compile_or_null(this.cache.text.get("mainstory"));
+    this.dialogue_vm = this.init_vm;
+    this.dialogue_vm = set_var_bool(this.dialogue_vm, "$test_from_js", true);
+    console.log("get test", get_var(this.dialogue_vm, "$test_from_js"));
+    console.log(
+      "get test dne",
+      get_var(this.dialogue_vm, "$$$$$var_not_exists_test"),
+    );
 
     this.setupIntroLevel();
     this.setupLowerLevel();
@@ -616,8 +627,6 @@ export class Game extends Scene {
       .setBounce(1)
       .setVelocity(Math.Between(-200, 200), 20);
     */
-
-    this.setupUI();
 
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.wasd = this.input.keyboard?.addKeys("W,S,A,D");
@@ -712,10 +721,8 @@ export class Game extends Scene {
     const name = (yarnNodeName || "").replace(/_/g, " ");
 
     if (continueJustReleased) {
+      console.log("SPACE");
       this.dialogue_vm = continue$(this.dialogue_vm);
-      if (saying(this.dialogue_vm) === "") {
-        this.dialogue_vm = continue$(this.dialogue_vm);
-      }
     }
     const currentDialogue =
       presentingOptions.length === 0 ? saying(this.dialogue_vm) : "";
@@ -1000,8 +1007,12 @@ export class Game extends Scene {
         obj.body?.position.x ?? obj?.getCenter().x ?? -Infinity,
         obj.body?.position.y ?? obj?.getCenter().y ?? -Infinity,
       ];
-      return Math.Distance.Between(this.player.x, this.player.y)<obj.width>;
-      playerConst.itemDistance ? obj.width / 2 : playerConst.itemDistance;
+      return (
+        Math.Distance.Between(this.player.x, this.player.y, x, y) <
+        (obj.width && obj.width > playerConst.itemDistance
+          ? obj.width
+          : playerConst.itemDistance)
+      );
     });
 
     // Messy UI code!
@@ -1038,9 +1049,9 @@ export class Game extends Scene {
     this.scene.restart();
   }
 
-  gameOver(text: string) {
-    this.intromusic.stop();
-    this.actionmusic.stop();
+  gameOver(text: string, pauseDelay: number = 2000) {
+    this.intromusic?.stop();
+    this.actionmusic?.stop();
     this.anims.pauseAll();
     this.gameoverText.setText("Game Over: " + text);
     this.gameoverBack.alpha = 0.65;
@@ -1050,7 +1061,7 @@ export class Game extends Scene {
       callback: () => this.physics?.pause(),
     });
     this.time.addEvent({
-      delay: 2000,
+      delay: pauseDelay,
       callback: () => this.restart(),
     });
   }

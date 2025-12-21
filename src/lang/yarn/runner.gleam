@@ -329,6 +329,13 @@ pub fn compile_or_null(source, filename) {
   State(..compile(source) |> result.unwrap(null_vm()), filename: filename)
 }
 
+pub fn compile_error(source, filename) -> String {
+  compile(source)
+  |> result.map(fn(_) { "" })
+  |> result.map_error(fn(e) { e })
+  |> result.unwrap_both
+}
+
 pub fn compile(source: String) -> Result(State, String) {
   source
   |> parse.parse
