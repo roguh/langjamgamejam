@@ -1,4 +1,5 @@
-import { Math, Scene, Input } from "phaser";
+import { Scene, Input } from "phaser";
+import Phaser from "phaser";
 import { wrap } from "../utils";
 import {
   compile_or_null,
@@ -284,7 +285,7 @@ export class Game extends Scene {
       this.items.push({
         obj,
         // TODO get Node text from VM?
-        text: Math.RND.pick([
+        text: Phaser.Math.RND.pick([
           "A squirrel sits watching another squirrel attentively",
           "**chitter chitter**",
           "It's just a squirrel",
@@ -587,7 +588,7 @@ export class Game extends Scene {
     // TODO log errors
     if (error) {
       console.log("Error compiling", error);
-      this.gameOver("COMPILATION ERROR", 5000);
+      this.gameOver("compilation error.", 5000);
       return;
     }
     this.init_vm = compile_or_null(this.cache.text.get("mainstory"));
@@ -616,17 +617,46 @@ export class Game extends Scene {
       this.player?.body.height,
     );
 
+    // 2nd level before tree
+    this.turrets = [
+      this.add.rectangle(480, 1861, 50, 50, 0xff0000),
+      this.add.rectangle(480 + 98, 1861, 50, 50, 0xff0000),
+    ];
+
+    this.turretguns = this.turrets.map((t) =>
+      this.add.rectangle(t.x, t.y - 15, 90, 18, 0xa04ff0),
+    );
+    const shoot = () =>
+      this.turrets.map((t) => {
+        const aim = Phaser.Math.Angle.Between(
+          this.player.x,
+          this.player.y - Phaser.Math.FloatBetween(20, 40),
+          t.x,
+          t.y,
+        );
+
+        if (
+          Phaser.Math.Distance.Between(this.player.x, this.player.y, t.x, t.y) >
+          W * 0.9
+        ) {
+          return;
+        }
+        this.bombs
+          .create(t.x, t.y - 35, "bomb")
+          .setBounce(6)
+          .setVelocity(-Math.cos(aim) * 400, -Math.sin(aim) * 400);
+      });
+    this.time.addEvent({
+      delay: Phaser.Math.Between(900, 1300),
+      loop: true,
+      callbackContext: this,
+      callback: shoot,
+    });
+
     this.camera = this.cameras.main;
     this.setupAnims();
 
     this.bombs = this.physics.add.group();
-
-    /*
-    this.bombs
-      .create(400, 300, "bomb")
-      .setBounce(1)
-      .setVelocity(Math.Between(-200, 200), 20);
-    */
 
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.wasd = this.input.keyboard?.addKeys("W,S,A,D");
@@ -800,10 +830,20 @@ export class Game extends Scene {
       this.gameOver("The tree has consumed you.");
     }
     if (get_var(this.dialogue_vm, "$ending_vera_enlightened")[0] === true) {
-      this.gameOver("You have found enlightenment.");
+      this.gameOver("enlightenment found.");
     }
     const onGround =
       this.player.body?.touching.down || this.player?.tileCollide;
+
+    this.turretguns?.map((t, index) => {
+      const aim = Phaser.Math.Angle.Between(
+        this.player.x,
+        this.player.y,
+        this.turrets[index].x,
+        this.turrets[index].y,
+      );
+      t?.setRotation(aim);
+    });
 
     // WASD
     const lDown =
@@ -860,7 +900,7 @@ export class Game extends Scene {
     }
 
     if (
-      Math.Distance.Between(
+      Phaser.Math.Distance.Between(
         this.player.x,
         this.player.y,
         this.ship.x,
@@ -985,13 +1025,18 @@ export class Game extends Scene {
 
     this.squirrels.children.iterate((s) =>
       s.anims.play(
-        { key: "squirrel-idle", frameRate: Math.Between(3, 8) },
+        { key: "squirrel-idle", frameRate: Phaser.Math.Between(3, 8) },
         true,
       ),
     );
     const talkers = Object.entries(this.conversationalists).filter(
       ([_, obj]) =>
-        Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y) <
+        Phaser.Math.Distance.Between(
+          this.player.x,
+          this.player.y,
+          obj.x,
+          obj.y,
+        ) <
         (obj.width && obj.width / 2 > playerConst.dialogueDistance
           ? obj.width / 2
           : playerConst.dialogueDistance),
@@ -1008,7 +1053,7 @@ export class Game extends Scene {
         obj.body?.position.y ?? obj?.getCenter().y ?? -Infinity,
       ];
       return (
-        Math.Distance.Between(this.player.x, this.player.y, x, y) <
+        Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y) <
         (obj.width && obj.width > playerConst.itemDistance
           ? obj.width
           : playerConst.itemDistance)
@@ -1068,14 +1113,17 @@ export class Game extends Scene {
 
   hitBomb(_bomb: any, player: Phaser.GameObjects.Sprite) {
     _bomb.alpha = 0;
-    this.gameOver("You hit a bomb.");
+    this.gameOver("shot by bomb.");
   }
 
   hitSpike(_a, _b) {
-    this.gameOver("You landed on a spike.");
+    this.gameOver("impaled on a spike.");
   }
 
   onTileCollision(obj, tile) {
+    if (this.bombs.children.contains(obj)) {
+      obj.destroy();
+    }
     if (obj === this.player) {
       if (obj.y >= this.player.y) {
         this.player.tileCollide = true;
@@ -1085,6 +1133,6 @@ export class Game extends Scene {
       }
     }
     if (obj === this.player && tile?.properties?.kill === true)
-      this.gameOver("You landed on a spike.");
+      this.gameOver("landed on a spike.");
   }
 }
