@@ -226,3 +226,48 @@ phaser extension
 console and typescript checker ESSENTIAL for viewing errors
 FPS extension is cool
 
+# Day 6, 7, and 8: Completion and retrospective
+
+For this year's LangJam GameJam, my friend Eymbr and I worked on a narrative platformer videogame.
+You jump around avoiding spikes and cliffs, and you can speak to NPCs to explore the world and to understand the story.
+Eymbr wrote about 5 pages of lore for the game, including a few conversations.
+We encoded the dialogue system using the Yarn programming language, which is a writer-friendly way to describe interactive narratives.
+
+Although there are existing ways to run Yarn scripts in a videogame, I implemented a way to write and run Yarn scripts using Gleam, a fairly new programming language that offers many ways to write correct yet efficient programs quickly. It's almost bug-free ;)
+I implemented a parser and an interpreter in Gleam.
+I used the Atto parser combinator to read Yarn files.
+Then, I generated a list of instructions run by a interpreter working on immutable data.
+All of this code runs from within the videogame to powers its dialogue system,
+and I also wrote a development environment with Gleam's Lustre library (similar to React).
+
+The Gleam parser and interpreter are over 11 megabytes of compiled JavaScript, while the game needed less than 1 megabyte excluding music and images.
+While the interpreter was perfect for development speed, it'd make more sense to write a dedicate interpreter for the instructions in JavaScript.
+With this, I could embed the list of instructions and a more efficient interpreter using less space.
+Another alternative is compiling the program into official Yarn bytecode, and then this code could run on any Yarn VM.
+I also want to write test programs in Yarn to see how well the implementation performs compared to other languages.
+Yarn is an unusual programming language, but it is Turing complete so it can run any type program.
+
+What took me the longest was thinking of a programming language to implement.
+I avoided looking at other entries as much as possible (on itch.io and discord).
+This is also the second interpreter I've implemented this year, the last one was based on the 2nd part of Crafting Interpreters. It is an extended implementation of Lox written in C with a Pratt parser and enough language extensions to run complicated programs like big-integer algorithms and the FFT algorithm.
+I wanted to achieve something similar with whatever language I chose for this gamejam, but I didn't have enough time to fully test my new language with the same rigour.
+I'm glad I could create a working interpreter though!
+It handles the dialogue we needed for the game and I hope Yarn can help me and my friend create more interactive videogames in the near future.
+
+This week was my first time working with Gleam.
+I looked at Elm and Purescript, but I turned to Gleam because it has a much more active ecosystem and while offering many of the same strict typing guarantees that these other languages offer.
+Although there aren't many libraries for it, it wasn't too difficult to write the features I needed.
+The minimal syntax and the "one-way-to-do-things" in Gleam helps a lot with productivity.
+The compiler caught most of my bugs ahead of time, but I found a couple runtime crashes that I'll post about on Gleam's Github issues if needed.
+
+I created a running animation for a character I drew; this was my first time animating. Motion is a key part in engaging videogames.
+I used Phaser3 and TypeScript to implement the rest of the platformer.
+Gleam compiles to TypeScript/JavaScript and it was straightforward to use the Gleam code from within Phaser3.
+
+This year's Langjam Gamejam was AWESOME and I look forward to next year's.
+
+
+TODO Itch.io entries
+TODO Itch.io link
+TODO Github link
+TODO Github yarn link (IN progress)
