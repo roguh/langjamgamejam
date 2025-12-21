@@ -458,9 +458,10 @@ fn run_one_instr(vm, i: Instruction) {
           // no-op if top is false
           {
             let i = vm.jump_table |> dict.get(s) |> result.unwrap(0)
-            echo vm.nodes
-              |> dict.get(vm.node)
-              |> result.map(fn(n) { #(n, n |> glearray.get(i)) })
+            // /////////// this was tricky
+            // echo vm.nodes
+            //   |> dict.get(vm.node)
+            //   |> result.map(fn(n) { #(n, n |> glearray.get(i)) })
             i
           },
           vm.ip + 1,
@@ -473,8 +474,7 @@ fn run_one_instr(vm, i: Instruction) {
     JumpIfFalse(offset) ->
       // pop and change IP
       State(..vm, ip: vm.ip + if_false(vm |> top, offset, 1), stack: vm |> rest)
-    JumpNode(n) ->
-      State(..vm, node: n, say: [], stack: [], ip: 0, state: Running)
+    JumpNode(n) -> vm |> jump_to_node(n)
     Halt -> State(..vm, state: Stopped)
     Return -> todo as "runner return unimplemented"
   }
@@ -579,8 +579,9 @@ pub fn choose(vm: State, index: Int) -> State {
             ..vm,
             state: WaitingOnContinue,
             say: [],
-            stack: vm |> push(echo VString(index |> int.to_string)),
+            stack: vm |> push(VString(index |> int.to_string)),
           )
+          |> continue
       }
     _ -> {
       echo "Warning! it is a no-op to choose in this state"
@@ -605,6 +606,10 @@ pub fn goto_node(vm: State, new) -> State {
   State(..vm, node: new, ip: 0, state: WaitingOnContinue, say: [])
 }
 
+pub fn current_node(vm: State) -> String {
+  vm.node
+}
+
 pub fn needs_choice(vm: State) -> List(String) {
   case vm.state {
     WaitingOnChoice -> vm.say
@@ -612,10 +617,18 @@ pub fn needs_choice(vm: State) -> List(String) {
   }
 }
 
+pub fn jump_to_node(vm: State, node: String) {
+  State(..vm, node: node, say: [], stack: [], ip: 0, state: WaitingOnContinue)
+}
+
+pub fn needs_choice_arr(vm: State) -> Array(String) {
+  vm |> needs_choice |> glearray.from_list
+}
+
 pub fn needs_continue(vm: State) -> Bool {
   vm.state == WaitingOnContinue
 }
 
-pub fn saying(vm: State) -> List(String) {
-  vm.say
+pub fn saying(vm: State) -> String {
+  vm.say |> string.join("\n")
 }

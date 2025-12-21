@@ -3,10 +3,14 @@ import { wrap } from "../utils";
 import {
   compile_or_null,
   needs_continue,
+  needs_choice_arr,
   continue$,
   set_var_bool,
   get_var,
   saying,
+  jump_to_node,
+  current_node,
+  choose,
   // goto_node,
 } from "../../gleamjunk/glisten48/lang/yarn/runner";
 
@@ -25,8 +29,6 @@ const PHI = 0.5 + 5 ** 0.5 * 0.5;
 // const MAX_DIALOGUE = ".......................".length; // for width 300*PHI
 const MAX_DIALOGUE = ((W / 10) * 0.95) | 0; // for width 1024
 const MAX_CHOICES = 5;
-const EMPTY_DIALOGUE = null;
-const INIT_DIALOGUE = "";
 
 let game = null;
 
@@ -45,12 +47,6 @@ const playerConst = {
   interactMinDuration: 1000,
 };
 
-type DialogueExecutionState =
-  | "Stopped"
-  | "WaitingOnOptionSelection"
-  | "WaitingOnContinue"
-  | "Running";
-
 function gleamList(a: any): string[] {
   if (a?.head) {
     return ["" + a.head].concat(gleamList(a?.tail));
@@ -60,9 +56,6 @@ function gleamList(a: any): string[] {
 
 export class Game extends Scene {
   public camera: Phaser.Cameras.Scene2D.Camera;
-  public currentDialogue: string;
-  public dialogueState: DialogueExecutionState;
-  public dialogueVM: string[];
   public platforms: Phaser.Physics.Arcade.StaticGroup;
   public spikes: Phaser.Physics.Arcade.StaticGroup;
   public bombs: Phaser.Physics.Arcade.Group;
@@ -95,8 +88,6 @@ export class Game extends Scene {
   public ship: Phaser.Physics.Arcade.Sprite;
   public tree: Phaser.Physics.Arcade.Sprite;
   public squirrels: Phaser.Physics.Arcade.Group;
-  public conversationalists: Record<string, Phaser.Physics.Arcade.Sprite>;
-  public items: { text: string; obj: Phaser.GameObjects.GameObject }[] = [];
   public playerTimes = {
     grounded: 0,
     releaseLeft: 0,
@@ -107,33 +98,32 @@ export class Game extends Scene {
   public coyoteTime: number = 200; // milliseconds
   public cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   public wasd?: object;
-  public vm: object;
+  public nums: Record<
+    // This int is passed to Yarn dialogue VM as the user's conversation choice
+    number,
+    Phaser.Input.Keyboard.Key | undefined
+  >;
+  public conversationalists: Record<
+    // This string is passed to the Yarn dialogue VM as the Node name (character/item)
+    string,
+    Phaser.Physics.Arcade.Sprite
+  >;
+  // TODO: Use Yarn VM to get dialogue and use object's ID as the Node name
+  public items: { text: string; obj: Phaser.GameObjects.GameObject }[] = [];
+  // This is the dialogue VM
+  public dialogue_vm: object;
+  // This is a fresh dialogue VM useful during game resets
   public init_vm: object;
 
   constructor() {
     super("Game");
     game = this;
-    this.dialogueState = "WaitingOnContinue";
-    this.dialogueVM = [
-      "Hello, fair traveler!",
-      "The Tree is found deeper into the woods towards the bottom-right side of your screen :)",
-    ];
-    this.currentDialogue = INIT_DIALOGUE;
-    this.items = [];
-    this.conversationalists = {};
-
-    this.init_vm = this.vm = compile_or_null("title: Test\n---\na b c===\n");
-    console.log(needs_continue(this.vm));
-    this.vm = continue$(this.vm);
-    console.log(gleamList(saying(this.vm)).join("\n"));
-    this.vm = set_var_bool(this.vm, "$jstest", true);
-    console.log(get_var(this.vm, "$$$$$notexists"));
-    console.log(get_var(this.vm, "$jstest")[0]);
   }
 
   preload() {
     this.load.setPath("assets");
 
+    this.load.text("teststory", "dialog/main/heat_from_fire.yarn");
     this.load.audio("intro", [
       "music/Silk Abbess (Promo Video) - Eymbr.ogg",
       "music/Silk Abbess (Promo Video) - Eymbr.mp3",
@@ -237,6 +227,17 @@ export class Game extends Scene {
       .staticSprite(-600 - 100, 568 - 168 + 48 + TILE_OFFSET_Y, "ship")
       .setScale(2);
 
+    // ShipBookshelves
+    // -596, 709
+    // -512,709  seat
+    // -704,709
+    this.items.push({
+      obj: this.add.rectangle(-596, 709, 10, 10, 0xff0000).setAlpha(0.5),
+      text: saying(
+        continue$(jump_to_node(this.dialogue_vm, "ShipBookshelves")),
+      ),
+    });
+
     // Squirrels
     const rescueSquirrel = this.squirrels
       .create(-600 - platW - 60, 350, "squirrel")
@@ -245,6 +246,7 @@ export class Game extends Scene {
       .setCollideWorldBounds(true)
       .setScale(1.5)
       .setSize(40, 48);
+    // TODO tutorial squirrel
     this.conversationalists.RescueSquirrel = rescueSquirrel;
     this.squirrels
       .create(400, 350, "squirrel")
@@ -269,7 +271,7 @@ export class Game extends Scene {
       .setScale(1.5)
       .refreshBody();
     mainSquirrel.flipX = true;
-    this.conversationalists.SquirrelPriest = mainSquirrel;
+    this.conversationalists.SquirrelTreeHints = mainSquirrel;
     this.squirrels.children.iterate((obj) => {
       obj.y += TILE_OFFSET_Y;
       if (obj === mainSquirrel) return null;
@@ -549,7 +551,21 @@ export class Game extends Scene {
   }
 
   create() {
+    this.items = [];
+    this.conversationalists = {};
+
+    // idk why this
     this.sound.unlock();
+
+    this.init_vm = compile_or_null(this.cache.text.get("teststory"));
+    this.dialogue_vm = this.init_vm;
+    console.log("saying", gleamList(saying(this.dialogue_vm)));
+    this.dialogue_vm = set_var_bool(this.dialogue_vm, "$test_from_js", true);
+    console.log("get test", get_var(this.dialogue_vm, "$test_from_js"));
+    console.log(
+      "get test dne",
+      get_var(this.dialogue_vm, "$$$$$var_not_exists_test"),
+    );
 
     // 512,384 is the center of the screen
     this.add
@@ -601,6 +617,13 @@ export class Game extends Scene {
 
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.wasd = this.input.keyboard?.addKeys("W,S,A,D");
+    this.nums = {
+      1: this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ONE),
+      2: this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.TWO),
+      3: this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.THREE),
+      4: this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR),
+      5: this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.FIVE),
+    };
 
     // Run these after all other init
     this.physics.add.collider(this.player, this.platforms);
@@ -650,81 +673,62 @@ export class Game extends Scene {
     console.log(this.actionmusic.isPaused, "ispaus");
   }
 
-  continueDialogue(): string | null {
-    console.log(this.dialogueState, this.currentDialogue);
-    // Return the next line of dialogue, if any
-
-    // Temporary: show choices at end
-    if (this.dialogueVM.length === 0) {
-      this.dialogueState = "WaitingOnOptionSelection";
-      return EMPTY_DIALOGUE;
-    }
-
-    // No more lines!
-    if (this.dialogueState === "Stopped") return EMPTY_DIALOGUE;
-    if (this.dialogueVM.length === 0) {
-      this.dialogueState = "Stopped";
-      return EMPTY_DIALOGUE;
-    }
-    if (this.dialogueState === "Running") {
-      // Skip to end?
-      this.dialogueState = "WaitingOnContinue";
-      this.playerTimes.dialogueStart = -100000000;
-      return EMPTY_DIALOGUE;
-    }
-    const res = this.dialogueVM[0];
-    this.playerTimes.dialogueStart = this.time.now;
-    this.dialogueVM = this.dialogueVM.slice(1);
-    if (this.dialogueState === "WaitingOnContinue") {
-      // Start new line
-      this.dialogueState = "Running";
-    }
-    return res;
-  }
-
   updateDialogue(
     continueJustReleased: boolean,
+    choices: Record<number, boolean>, // pass straight to VM
     yarnNodeName: string,
     obj: Phaser.GameObjects.GameObject,
   ) {
     let next;
+
+    if (current_node(this.dialogue_vm) != yarnNodeName) {
+      this.dialogue_vm = jump_to_node(this.dialogue_vm, yarnNodeName);
+    }
+
     this.dialogueElements.map((e) => (e.alpha = 1));
     this.dialogueChoiceElements.forEach((l) =>
       l.forEach((e) => (e.alpha = 0.65)),
     );
-    if (this.dialogueState !== "WaitingOnOptionSelection") {
-      this.dialogueChoiceText.forEach((l) => l.forEach((e) => (e.alpha = 0)));
-      this.dialogueChoiceElements.forEach((l) =>
-        l.forEach((e) => (e.alpha = 0)),
+    const presentingOptions = needs_choice_arr(this.dialogue_vm);
+    if (presentingOptions.length < MAX_CHOICES) {
+      this.dialogueChoiceText.forEach((l, ix) =>
+        l.forEach((e) => {
+          e.alpha = ix >= presentingOptions.length ? 0 : 1;
+          if (ix < presentingOptions.length) {
+            if (e.x > 32 * PHI) e.setText(presentingOptions[ix]);
+          }
+        }),
+      );
+      this.dialogueChoiceElements.forEach((l, ix) =>
+        l.forEach((e) => (e.alpha = ix >= presentingOptions.length ? 0 : 0.65)),
       );
     }
     this.dialogueBox.alpha = 0.65;
     const name = yarnNodeName;
 
+    const currentDialogue =
+      presentingOptions.length === 0 ? saying(this.dialogue_vm) : "";
     if (continueJustReleased) {
-      if ((next = this.continueDialogue())) this.currentDialogue = next;
+      this.dialogue_vm = continue$(this.dialogue_vm);
     }
-    if (this.dialogueState === "Running") {
-      // If running, animate at obj location
-      const ix =
-        (1 + (this.time.now - this.playerTimes.dialogueStart) / 60) | 0;
-      const sub = this.currentDialogue.slice(0, ix);
-      this.dialogueText.setText(wrap(sub, MAX_DIALOGUE));
-      if (ix == this.currentDialogue.length) {
-        // If animation is done, switch states
-        if ((next = this.continueDialogue())) this.currentDialogue = next;
-      }
-      this.dialogueHow.setText(name + ": " + "");
-    } else {
-      this.dialogueText.setText(wrap(this.currentDialogue, MAX_DIALOGUE));
-      let t = "";
-      if (this.dialogueState === "WaitingOnContinue") {
-        t = "Press SPACE to continue";
-      } else if (this.dialogueState === "WaitingOnOptionSelection") {
-        t = "Press NUMBER to select";
-      }
-      this.dialogueHow.setText(name + ": " + t);
+    const justChose = Object.entries(choices)
+      .filter(([ix, val]) => val)
+      .map(([ix, _]) => ix);
+    if (justChose.length > 0) {
+      this.dialogue_vm = choose(this.dialogue_vm, Number(justChose[0]) - 1);
     }
+
+    // If running, animate at obj location
+    const ix = (1 + (this.time.now - this.playerTimes.dialogueStart) / 60) | 0;
+    const sub = currentDialogue.slice(0, ix);
+    this.dialogueText.setText(wrap(sub, MAX_DIALOGUE));
+    let t = "";
+    if (needs_continue(this.dialogue_vm)) {
+      t = "Press SPACE to continue";
+    } else if (presentingOptions.length > 0) {
+      t = "Press NUMBER to select";
+    }
+    this.dialogueHow.setText(name + ": " + t);
   }
 
   closeDialogue() {
@@ -930,6 +934,19 @@ export class Game extends Scene {
       this.pad((p) => p.X || p.Y);
     false;
 
+    const choices = {
+      1: false,
+      2: false,
+      3: false,
+      4: false,
+      5: false,
+    };
+    Object.entries(this.nums).forEach(([key, value]) => {
+      if (value && Input.Keyboard.JustUp(value)) {
+        choices[key as keyof typeof choices] = true;
+      }
+    });
+
     this.squirrels.children.iterate((s) =>
       s.anims.play(
         { key: "squirrel-idle", frameRate: Math.Between(3, 8) },
@@ -943,8 +960,9 @@ export class Game extends Scene {
           ? obj.width / 2
           : playerConst.dialogueDistance),
     );
-    if (talkers.length > 0 && talkers.length > 0) {
-      this.updateDialogue(spaceJustUp, ...talkers[0]);
+    if (talkers.length > 0 && talkers.length > 0 && this.isInteracting) {
+      this.lastNode = talkers[0];
+      this.updateDialogue(spaceJustUp, choices, ...talkers[0]);
     } else {
       this.closeDialogue();
     }
@@ -975,6 +993,8 @@ export class Game extends Scene {
       this.canInteractText.setText("");
     }
     if (!nearInteractive) {
+      if (this.lastNode)
+        this.dialogue_vm = jump_to_node(this.dialogue_vm, this.lastNode);
       this.isInteracting = false;
     }
 
