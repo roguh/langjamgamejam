@@ -23,12 +23,20 @@ type YarnMode {
 }
 
 type YarnRun {
-  YarnRun(fname: String, source: String, mode: YarnMode)
+  YarnRun(fname: String, source: String, mode: YarnMode, debug_trace: Bool)
 }
 
 type YarnCommand {
   Nothing
   YarnRunCommand(YarnRun)
+}
+
+fn debug_trace() -> Opt(Bool) {
+  opt.new("trace")
+  |> opt.short("t")
+  |> opt.help("Enable trace printing for each instruction being executed.")
+  |> opt.map(fn(_) { True })
+  |> opt.default(False)
 }
 
 fn file() -> Opt(Result(String, Nil)) {
@@ -66,9 +74,11 @@ fn mode() -> Opt(YarnMode) {
 
 fn command() -> clip.Command(Result(YarnCommand, String)) {
   clip.command({
+    use debug_trace <- clip.parameter
     use fname <- clip.parameter
     use eval <- clip.parameter
     use mode <- clip.parameter
+    echo debug_trace
     result.or(
       fname
         |> result.replace_error("No filename given")
@@ -77,18 +87,24 @@ fn command() -> clip.Command(Result(YarnCommand, String)) {
         })
         |> result.flatten
         |> result.map(fn(source) {
-          YarnRunCommand(YarnRun(fname |> result.unwrap(""), source, mode))
+          YarnRunCommand(YarnRun(
+            fname |> result.unwrap(""),
+            source,
+            mode,
+            debug_trace,
+          ))
         }),
       result.or(
         eval
           |> result.replace_error("No filename or --eval given")
           |> result.map(fn(source) {
-            YarnRunCommand(YarnRun("<eval>", source, mode))
+            YarnRunCommand(YarnRun("<eval>", source, mode, debug_trace))
           }),
         Ok(Nothing),
       ),
     )
   })
+  |> clip.opt(debug_trace())
   |> clip.opt(file())
   |> clip.opt(eval())
   |> clip.opt(mode())
@@ -102,7 +118,9 @@ fn run_yarn(y: YarnRun) {
       |> result.map_error(pretty_error)
     PrintInstructions -> runner.compile(y.source) |> result.map(runner.print)
     Interpret ->
-      runner.compile(y.source) |> result.map(runner_cli.start_loop(_, y.fname))
+      runner.compile(y.source)
+      |> result.map(runner_cli.start_loop(_, y.fname, y.debug_trace))
+      |> result.replace("The end.")
     CompileJS -> Error("JS compilation not implemented yet")
     CompileLua -> Error("Lua compilation not implemented yet")
   }

@@ -10,6 +10,8 @@ import glearray.{type Array}
 import lang/yarn/ast
 import lang/yarn/parse
 
+import gleam/io
+
 pub type State {
   State(
     state: ExecutionState,
@@ -25,6 +27,7 @@ pub type State {
     // It is either a list of dialogue, or a list of choices depending on the exec state
     say: List(String),
     filename: String,
+    trace_print: Bool,
   )
 }
 
@@ -46,6 +49,7 @@ pub type Operand {
 pub type Instruction {
   // Labels are converted to instruction pointers and added to jump table
   Label(String)
+  // Return to previous node
   Return
   // Go to another node
   JumpNode(node_name: String)
@@ -53,7 +57,9 @@ pub type Instruction {
   Jump(instr_offset: Int)
   // Conditional jump
   JumpIfFalse(instr_offset: Int)
+  // Unconditional jump to label
   JumpLabel(label: String)
+  // Conditional jump to label
   JumpLabelIfFalse(label: String)
   // Data jump: jump to number on top of stack
   JumpToTop
@@ -67,13 +73,10 @@ pub type Instruction {
   Native(String)
   Push(Operand)
   Pop
-  Dup
   // Stop execution
   Halt
   // Show text to the player
   ISay(Option(String))
-  // Pop N strings from stack and show as a list to player, possibly as a list of choices
-  ISayn(Int)
   IWaitChoice
   IWaitContinue
 }
@@ -143,10 +146,8 @@ pub fn print_instrs(instrs: Array(Instruction), jump_table: Dict(String, Int)) {
       Get(var_name) -> "Get(" <> var_name <> ")"
       Push(operand) -> "Push(" <> operand |> print_op <> ")"
       Pop -> "Pop"
-      Dup -> "Dup"
       Halt -> "Halt"
       ISay(name) -> "ISay(" <> nameify(name) <> ")"
-      ISayn(n) -> "ISayn(" <> n |> s <> ")"
       IWaitContinue -> "IWaitContinue"
       IWaitChoice -> "IWaitChoice"
       Binary(op) -> "Binary(" <> op <> ")"
@@ -169,6 +170,7 @@ pub fn null_vm() {
     node: "",
     nodes: dict.from_list([]),
     filename: "",
+    trace_print: False,
   )
 }
 
@@ -217,7 +219,7 @@ fn compile_line(l: List(ast.LineElement)) {
 fn compile_choice(
   cs,
   label: String,
-  picking_code: List(Instruction),
+  choice_as_top: List(Instruction),
   restate_chosen: Bool,
 ) {
   let endlabel = label <> "end_" <> rand_id()
@@ -236,37 +238,29 @@ fn compile_choice(
   //4 appends :)
   list.append(
     list.append(
-      list.append(
-        list.append(
-          cs
-            |> list.map(fn(c) { c.content |> compile_line })
-            |> list.flatten,
-          picking_code,
-        ),
-        cs
-          |> list.index_map(fn(_, index) {
-            // Now Jump!
-            // TODO faster jump selection...
-            [
-              Dup,
-              Push(VFloat(index |> int.to_float)),
-              Binary("!="),
-              JumpLabelIfFalse(index |> lbl),
-            ]
-          })
-          |> list.flatten,
-      ),
+      list.append(choice_as_top, [
+        // Jump Table
+        // The top of the stack is guaranteed to be between 0 and N-1
+        // Jump to 1+choice, then jump to choice's label
+        Push(VFloat(1.0)),
+        Binary("+"),
+        JumpToTop,
+        ..cs
+        |> list.index_map(fn(_, index) { JumpLabel(index |> lbl) })
+      ]),
       cs
         |> list.index_map(fn(c, index) {
           // Run contents then jump to end of this choice to skip over all other choices
-          // TODO fallthrough for last choice
           list.append(
             [
               Label(index |> lbl),
               ..list.append(
                 case restate_chosen {
                   True ->
-                    list.append(c.content |> compile_line, [ISay(option.None)])
+                    list.append(c.content |> compile_line, [
+                      ISay(option.None),
+                      IWaitContinue,
+                    ])
                   False -> []
                 },
                 c.next |> compile_,
@@ -293,14 +287,33 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
         compile_choice(
           cs,
           "choice",
-          [
-            // Present the user N strings from the stack
-            ISayn(cs |> list.length),
-            // Wait for the user to choose an option and leave choice on stack as a VFloat
-            // 0.0 1.0 2.0 ...
-            IWaitChoice,
-          ],
+          list.append(
+            // Step 1/3: Leave choice contents as N strings on the stack
+            cs
+              |> list.map(fn(c) {
+                list.append(c.content |> compile_line, [
+                  // Step 2/3: Present the user N strings from the stack
+                  ISay(option.None),
+                ])
+              })
+              |> list.flatten,
+            [
+              // Step 3/3: The user will leave an integer between 0 and N-1 on top of the stack
+              IWaitChoice,
+            ],
+          ),
           False,
+        )
+      ast.LineGroup(items) ->
+        compile_choice(
+          items,
+          "linegroup",
+          [
+            // Leave a choice from 0 to N-1 on the stack as a string
+            Push(VFloat(items |> list.length |> int.subtract(1) |> int.to_float)),
+            Native("dice"),
+          ],
+          True,
         )
       ast.Cmd(ast.Jump(node_name)) -> [JumpNode(node_name)]
       ast.Cmd(ast.Stop) -> [Halt]
@@ -342,17 +355,6 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
           ],
         )
       }
-      ast.LineGroup(items) ->
-        compile_choice(
-          items,
-          "linegroup",
-          [
-            // Leave a choice from 0 to N-1 on the stack as a string
-            Push(VFloat(items |> list.length |> int.subtract(1) |> int.to_float)),
-            Native("dice"),
-          ],
-          True,
-        )
       ast.Cmd(ast.DeclEnum(_, _)) -> todo as "decl-enum not impl"
       ast.Cmd(ast.Arbitrary(_, _)) -> todo as "arbitrary not impl"
       ast.Cmd(ast.Detour(_)) -> todo as "detour not impl"
@@ -448,14 +450,24 @@ pub fn test_run(vm: State, inputs: List(Int)) -> State {
   }
 }
 
+fn debug(vm: State, msg: String) -> Nil {
+  case vm.trace_print {
+    True -> io.println_error(msg)
+    _ -> Nil
+  }
+}
+
 fn run_one_instr(vm: State, i: Instruction) {
-  // "i: "
-  // <> print_instrs(glearray.from_list([i]), vm.jump_table)
-  // <> "\nstack: "
-  // <> vm.stack |> list.map(print_op) |> string.join("; ")
+  vm
+  |> debug(
+    print_instrs(glearray.from_list([i]), vm.jump_table)
+    <> "\nstack: "
+    <> vm.stack |> list.map(print_op) |> string.join("; "),
+  )
 
   case i {
     Push(op) -> State(..vm, ip: vm.ip + 1, stack: vm |> push(op))
+    // TODO provide name to user as part of the public API
     ISay(name) ->
       State(
         ..vm,
@@ -465,17 +477,7 @@ fn run_one_instr(vm: State, i: Instruction) {
       )
     IWaitContinue -> State(..vm, ip: vm.ip + 1, state: WaitingOnContinue)
     IWaitChoice -> State(..vm, ip: vm.ip + 1, state: WaitingOnChoice)
-    // Pop N values, convert to strings
-    ISayn(n) ->
-      State(
-        ..vm,
-        ip: vm.ip + 1,
-        say: // Pop n values from stack and convert to strings
-          vm.stack |> list.take(n) |> list.map(print_op),
-        stack: vm.stack |> list.drop(n),
-      )
     Pop -> State(..vm, ip: vm.ip + 1, stack: vm |> rest)
-    Dup -> State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> top))
     Set(name) ->
       State(..vm |> set_var(name, vm |> top), ip: vm.ip + 1, stack: vm |> rest)
     Get(name) ->
@@ -500,14 +502,9 @@ fn run_one_instr(vm: State, i: Instruction) {
         ..vm,
         ip: if_false(
           vm |> top,
-          // no-op if bad label
-          // no-op if top is false
+          // TODO improve error handling? no-op if bad label; no-op if top is false;
           {
             let i = vm.jump_table |> dict.get(s) |> result.unwrap(0)
-            // /////////// this was tricky
-            // echo vm.nodes
-            //   |> dict.get(vm.node)
-            //   |> result.map(fn(n) { #(n, n |> glearray.get(i)) })
             i
           },
           vm.ip + 1,
@@ -518,7 +515,6 @@ fn run_one_instr(vm: State, i: Instruction) {
     JumpToTop ->
       State(..vm, ip: vm.ip + int_or(vm |> pop, 1), stack: vm |> rest)
     JumpIfFalse(offset) ->
-      // pop and change IP
       State(..vm, ip: vm.ip + if_false(vm |> top, offset, 1), stack: vm |> rest)
     JumpNode(n) -> vm |> jump_to_node(n)
     Halt -> State(..vm, state: Stopped)
@@ -562,20 +558,21 @@ fn bin(a_, b_, op: String) -> Operand {
       case a_, b_ {
         VFloat(a), VFloat(b) -> VBool(b >. a)
         VString(a), VString(b) -> VBool(string.compare(a, b) == order.Gt)
-        // TODO runtime errors!
+        // TODO handle runtime errors from interpreter!
         _, _ -> todo as "> runtime error"
       }
     "<" ->
       case a_, b_ {
         VFloat(a), VFloat(b) -> VBool(b <. a)
         VString(a), VString(b) -> VBool(string.compare(a, b) == order.Lt)
-        // TODO runtime errors!
+        // TODO handle runtime errors from interpreter!
         _, _ -> todo as "< runtime error"
       }
     "+" ->
       case a_, b_ {
         VFloat(a), VFloat(b) -> VFloat(b +. a)
         VString(a), VString(b) -> VString(a <> b)
+        // TODO handle runtime errors from interpreter!
         _, _ -> todo as "+ runtime error"
       }
     _ -> todo as "unknown binary op"
@@ -704,6 +701,34 @@ pub fn needs_continue(vm: State) -> Bool {
   vm.state == WaitingOnContinue
 }
 
-pub fn saying(vm: State) -> String {
-  vm.say |> list.reverse |> string.join("\n")
+pub fn saying_list(vm: State) -> List(String) {
+  case vm.state {
+    WaitingOnChoice -> []
+    Stopped -> []
+    _ -> vm.say |> list.reverse
+  }
+}
+
+pub fn saying(vm: State) -> Result(String, Nil) {
+  case vm.state {
+    WaitingOnChoice -> Error(Nil)
+    Stopped -> Error(Nil)
+    _ -> Ok(vm |> saying_list |> string.join("\n"))
+  }
+}
+
+pub fn is_start(vm: State) -> Bool {
+  vm.state == WaitingOnContinue && vm.say == [] && vm.ip == 0 && vm.stack == []
+}
+
+pub fn is_end(vm: State) -> Bool {
+  vm.state == Stopped
+}
+
+pub fn node_names(vm: State) -> List(String) {
+  vm.nodes |> dict.keys |> list.sort(string.compare)
+}
+
+pub fn debug_config(vm: State, debug_trace: Bool) -> State {
+  State(..vm, trace_print: debug_trace)
 }

@@ -12,7 +12,12 @@ fn read_line() -> String {
 }
 
 fn loop(vm: runner.State) {
-  let say = fn() { vm |> runner.saying |> io.println }
+  let print_say = fn(vm_) {
+    vm_
+    |> runner.saying
+    |> result.map(io.println)
+    vm_
+  }
 
   case runner.needs_choice(vm) |> list.length, runner.needs_continue(vm) {
     choices, _ if choices > 0 -> {
@@ -22,12 +27,14 @@ fn loop(vm: runner.State) {
       })
       let choice = case choices {
         1 -> {
-          io.print("Enter number 0 or press ENTER to keep going > ")
+          io.print("Press ENTER to choose option 1> ")
           0
         }
         l -> {
           io.print(
-            "Enter a number between 0 and " <> l |> int.to_string <> "> ",
+            "Type a number between 1 and "
+            <> l |> int.to_string
+            <> " then press ENTER> ",
           )
           Ok(read_line())
           |> result.map(string.trim)
@@ -36,22 +43,21 @@ fn loop(vm: runner.State) {
           |> result.unwrap(1)
         }
       }
-      vm |> runner.choose(choice - 1) |> loop
+      vm |> runner.choose(choice - 1) |> runner.continue |> print_say |> loop
     }
     _, True -> {
+      io.print("Press ENTER> ")
       read_line()
-      say()
-      vm |> runner.continue |> loop
+      vm |> runner.continue |> print_say |> loop
     }
-    _, _ -> {
+    _, False -> {
       vm
     }
   }
 }
 
-pub fn start_loop(vm: runner.State, fname: String) -> String {
+pub fn start_loop(vm: runner.State, fname: String, debug_trace: Bool) {
   io.println("Running yarn script: " <> fname)
-  io.println("Hello! Press ENTER to start.")
-  loop(vm)
-  "FIN!"
+  io.println("Hello! Welcome to this wonderful adventure. Node=" <> vm.node)
+  loop(vm |> runner.debug_config(debug_trace))
 }

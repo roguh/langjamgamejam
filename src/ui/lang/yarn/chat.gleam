@@ -61,9 +61,11 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
             ],
             [
               html.option([attribute.value("")], "GoTo?"),
-              ..vm.nodes
-              |> dict.to_list
-              |> list.map(fn(kv) { html.option([attribute.value(kv.0)], kv.0) })
+              ..vm
+              |> runner.node_names
+              |> list.map(fn(node_name) {
+                html.option([attribute.value(node_name)], node_name)
+              })
             ],
           ),
         ],
@@ -72,7 +74,7 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
     html.div(
       [y("margin", "1em 0"), y("min-height", "15vh")],
       case runner.needs_choice(vm) {
-        [] -> vm.say |> list.reverse |> list.map(p)
+        [] -> vm |> runner.saying_list |> list.map(p)
         _ -> []
       },
     ),
@@ -114,26 +116,30 @@ pub fn view(vm: runner.State, on_continue, on_choice, on_goto_node) {
         q(
           vm |> runner.needs_continue,
           html.button([event.on_click(on_continue)], [
-            html.text(case vm.say, vm.ip, vm.stack {
-              [], 0, [] -> ">>> Start story"
-              _, _, _ -> "> Continue"
+            html.text(case vm |> runner.is_start {
+              True -> ">>> Start story"
+              False -> "> Continue"
             }),
           ]),
           html.text(""),
         ),
-        case vm.state {
-          runner.Stopped ->
+        case vm |> runner.is_end {
+          True ->
             html.div([y("font-size", "200%")], [
               fancy_labeled("Fin", "", "darkgreen"),
             ])
-          _ -> html.text("")
+          False -> html.text("")
         },
         html.div([], [
           html.text("Stack: "),
-          html.text(vm.stack |> list.map(runner.print_op) |> string.join(", ")),
+          html.text(
+            // Using direct property access on State to show internal info
+            vm.stack |> list.map(runner.print_op) |> string.join(", "),
+          ),
         ]),
         html.div(
           [],
+          // Using direct property access on State to show internal info
           vm.vars
             |> dict.to_list
             |> list.reverse
