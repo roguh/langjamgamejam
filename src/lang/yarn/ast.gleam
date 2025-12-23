@@ -315,3 +315,14 @@ pub fn pretty_node(n: YarnNode) -> String {
 pub fn pretty(a: Yarn) -> String {
   a.nodes |> list.map(pretty_node) |> string.join("\n\n")
 }
+
+pub fn pretty_error(e: YarnError) -> String {
+  // YarnError(error: String, line: Int, col: Int, end_line: Int, end_col: Int)
+  let sloc = e.line |> int.to_string <> ":" <> e.col |> int.to_string
+  let eloc = e.end_line |> int.to_string <> ":" <> e.end_col |> int.to_string
+  let loc = case sloc == eloc {
+    True -> sloc
+    _ -> sloc <> " to " <> eloc
+  }
+  "Parse error found at line " <> loc <> ":\n" <> e.error
+}

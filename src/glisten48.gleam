@@ -1,5 +1,9 @@
 import editor
+import lang/yarn/cli
 
 pub fn main() {
-  editor.main()
+  case cli.main() {
+    True -> editor.main()
+    False -> Nil
+  }
 }

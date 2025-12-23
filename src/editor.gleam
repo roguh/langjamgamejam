@@ -5,6 +5,7 @@ import lustre/element/html
 import lustre/element/keyed
 import lustre/event
 
+import gleam/io
 import gleam/list
 import gleam/option
 import gleam/result
@@ -204,6 +205,7 @@ pub fn main() {
     Ok(_) -> Nil
     e -> {
       echo e
+      io.println("Try running with --file-name or --eval instead")
       Nil
     }
   }

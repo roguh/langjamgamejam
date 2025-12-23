@@ -100,6 +100,25 @@ fn nameify(name) {
   name |> option.map(fn(v) { v <> ": " }) |> option.unwrap("")
 }
 
+pub fn print(s: State) {
+  "Variables:\n"
+  <> s.vars
+  |> dict.to_list
+  |> list.map(fn(kv) { kv.0 <> " = " <> kv.1 |> print_op })
+  |> string.join("\n")
+  <> "\n\n"
+  <> s.nodes
+  |> dict.to_list
+  |> list.map(fn(kv) {
+    "Node: "
+    <> kv.0
+    <> "\n"
+    <> kv.1
+    |> print_instrs(s.jump_table)
+  })
+  |> string.join("\n\n")
+}
+
 pub fn print_instrs(instrs: Array(Instruction), jump_table: Dict(String, Int)) {
   let get_label = fn(l) {
     jump_table
@@ -339,9 +358,7 @@ pub fn compile_error(source, filename) -> String {
 pub fn compile(source: String) -> Result(State, String) {
   source
   |> parse.parse
-  |> result.map_error(fn(e) {
-    "Error at line " <> int.to_string(e.line) <> ": " <> e.error
-  })
+  |> result.map_error(ast.pretty_error)
   |> result.map(fn(y) {
     let ns =
       y.nodes
