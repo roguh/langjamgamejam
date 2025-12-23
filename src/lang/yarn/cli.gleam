@@ -1,4 +1,6 @@
+import gleam/int
 import gleam/io
+import gleam/list
 import gleam/result
 import gleam/string
 
@@ -19,11 +21,18 @@ type YarnMode {
   PrintInstructions
   CompileJS
   CompileLua
-  Interpret
+  Interactive
+  Test
 }
 
 type YarnRun {
-  YarnRun(fname: String, source: String, mode: YarnMode, debug_trace: Bool)
+  YarnRun(
+    fname: String,
+    source: String,
+    mode: YarnMode,
+    test_input: List(Int),
+    debug_trace: Bool,
+  )
 }
 
 type YarnCommand {
@@ -37,6 +46,29 @@ fn debug_trace() -> Opt(Bool) {
   |> opt.help("Enable trace printing for each instruction being executed.")
   |> opt.map(fn(_) { True })
   |> opt.default(False)
+}
+
+fn validate_test_input(s: String) -> Result(List(Int), String) {
+  s
+  |> string.split(",")
+  |> list.fold(Ok([]), fn(res, s) {
+    case res, int.parse(s) {
+      Error(_), _ -> res
+      _, Error(_) -> Error("Unable to parse integer \"" <> s <> "\"")
+      _, Ok(i) if i < 1 ->
+        Error("Input must be a positive integer, choices start at 1.")
+      Ok(r), Ok(v) -> Ok([v, ..r])
+    }
+  })
+  |> result.map(list.reverse)
+}
+
+fn test_input() -> Opt(Result(List(Int), String)) {
+  opt.new("test-input")
+  |> opt.short("i")
+  |> opt.help("Simulate these comma-separated user choices.")
+  |> opt.map(validate_test_input)
+  |> opt.default(Ok([]))
 }
 
 fn file() -> Opt(Result(String, Nil)) {
@@ -57,15 +89,22 @@ fn mode() -> Opt(YarnMode) {
   opt.new("mode")
   |> opt.short("m")
   |> opt.help(
-    "What to do with the Yarn source. One of: parse, instr, js, lua, interpret",
+    "What to do with the Yarn source. One of: parse, instr, js, lua, interact, test, or abbreviation p, s, j, l, i, t",
   )
   |> opt.map(fn(m) {
     case m |> string.lowercase {
       "parse" -> Parse
+      "p" -> Parse
       "instr" -> PrintInstructions
+      "s" -> PrintInstructions
       "js" -> CompileJS
+      "j" -> CompileJS
       "lua" -> CompileLua
-      "interpret" -> Interpret
+      "l" -> CompileLua
+      "interact" -> Interactive
+      "i" -> Interactive
+      "test" -> Test
+      "t" -> Test
       _ -> default_mode
     }
   })
@@ -74,11 +113,18 @@ fn mode() -> Opt(YarnMode) {
 
 fn command() -> clip.Command(Result(YarnCommand, String)) {
   clip.command({
+    use test_input <- clip.parameter
     use debug_trace <- clip.parameter
     use fname <- clip.parameter
     use eval <- clip.parameter
     use mode <- clip.parameter
-    echo debug_trace
+    let test_input_ =
+      test_input
+      |> result.map_error(fn(err) {
+        io.println_error("Unable to parser --test-input: " <> err)
+      })
+      |> result.unwrap([])
+
     result.or(
       fname
         |> result.replace_error("No filename given")
@@ -91,6 +137,7 @@ fn command() -> clip.Command(Result(YarnCommand, String)) {
             fname |> result.unwrap(""),
             source,
             mode,
+            test_input_,
             debug_trace,
           ))
         }),
@@ -98,12 +145,19 @@ fn command() -> clip.Command(Result(YarnCommand, String)) {
         eval
           |> result.replace_error("No filename or --eval given")
           |> result.map(fn(source) {
-            YarnRunCommand(YarnRun("<eval>", source, mode, debug_trace))
+            YarnRunCommand(YarnRun(
+              "<eval>",
+              source,
+              mode,
+              test_input_,
+              debug_trace,
+            ))
           }),
         Ok(Nothing),
       ),
     )
   })
+  |> clip.opt(test_input())
   |> clip.opt(debug_trace())
   |> clip.opt(file())
   |> clip.opt(eval())
@@ -117,9 +171,17 @@ fn run_yarn(y: YarnRun) {
       |> result.map(pretty)
       |> result.map_error(pretty_error)
     PrintInstructions -> runner.compile(y.source) |> result.map(runner.print)
-    Interpret ->
+    Test ->
       runner.compile(y.source)
-      |> result.map(runner_cli.start_loop(_, y.fname, y.debug_trace))
+      |> result.map(runner.debug_config(_, y.debug_trace))
+      |> result.map(runner.set_filename(_, y.fname))
+      |> result.map(runner_cli.start_test(_, y.test_input))
+      |> result.replace("The end.")
+    Interactive ->
+      runner.compile(y.source)
+      |> result.map(runner.debug_config(_, y.debug_trace))
+      |> result.map(runner.set_filename(_, y.fname))
+      |> result.map(runner_cli.start_loop)
       |> result.replace("The end.")
     CompileJS -> Error("JS compilation not implemented yet")
     CompileLua -> Error("Lua compilation not implemented yet")

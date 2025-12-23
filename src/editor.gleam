@@ -54,14 +54,16 @@ fn update(model: Model, event: Event) -> Model {
         ..model,
         source: source,
         comp: parse.parse(source),
-        vm: runner.compile_or_null(source, model.vm.filename),
+        vm: runner.compile_or_null(source)
+          |> runner.set_filename(model.vm.filename),
         iteration: model.iteration + 1 % 2_000_000_000,
       )
     Load(source) ->
       Model(
         ..model,
         source: assets.load(source),
-        vm: runner.compile_or_null(assets.load(source), source),
+        vm: runner.compile_or_null(assets.load(source))
+          |> runner.set_filename(source),
         comp: parse.parse(assets.load(source)),
         iteration: model.iteration + 1 % 2_000_000_000,
         name: assets.name(source) |> option.unwrap(model.custom_name),
@@ -193,7 +195,7 @@ fn init(_args) -> Model {
     iteration: 0,
     name: assets.name(t) |> option.unwrap("(no name)"),
     custom_name: "",
-    vm: runner.compile_or_null(assets.load(t), t),
+    vm: runner.compile_or_null(assets.load(t)) |> runner.set_filename(t),
     cat_is: cat_is,
   )
 }

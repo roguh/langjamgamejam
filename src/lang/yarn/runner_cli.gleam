@@ -16,37 +16,42 @@ fn loop(vm: runner.State) {
     vm_
     |> runner.saying
     |> result.map(io.println)
+    |> result.unwrap(Nil)
     vm_
+  }
+
+  let get_choice = fn(choices) {
+    runner.needs_choice(vm)
+    |> list.index_map(fn(c, ix) {
+      io.println(ix + 1 |> int.to_string <> ": " <> c)
+    })
+    case choices {
+      1 -> {
+        io.print("Press ENTER to choose option 1>>>> ")
+      }
+      l -> {
+        io.print(
+          "Type a number between 1 and "
+          <> l |> int.to_string
+          <> " then press ENTER>>>> ",
+        )
+      }
+    }
+    Ok(read_line())
+    |> result.map(string.trim)
+    |> result.map(int.parse)
+    |> result.map(result.unwrap(_, 1))
+    |> result.unwrap(1)
+    // User input is 1-indexed, the VM is 0-indexed
+    |> int.subtract(1)
   }
 
   case runner.needs_choice(vm) |> list.length, runner.needs_continue(vm) {
     choices, _ if choices > 0 -> {
-      runner.needs_choice(vm)
-      |> list.index_map(fn(c, ix) {
-        io.println(ix + 1 |> int.to_string <> ": " <> c)
-      })
-      let choice = case choices {
-        1 -> {
-          io.print("Press ENTER to choose option 1> ")
-          0
-        }
-        l -> {
-          io.print(
-            "Type a number between 1 and "
-            <> l |> int.to_string
-            <> " then press ENTER> ",
-          )
-          Ok(read_line())
-          |> result.map(string.trim)
-          |> result.map(int.parse)
-          |> result.map(result.unwrap(_, 1))
-          |> result.unwrap(1)
-        }
-      }
-      vm |> runner.choose(choice - 1) |> runner.continue |> print_say |> loop
+      vm |> runner.choose(get_choice(choices)) |> print_say |> loop
     }
     _, True -> {
-      io.print("Press ENTER> ")
+      io.print("Press ENTER>>>> ")
       read_line()
       vm |> runner.continue |> print_say |> loop
     }
@@ -56,8 +61,11 @@ fn loop(vm: runner.State) {
   }
 }
 
-pub fn start_loop(vm: runner.State, fname: String, debug_trace: Bool) {
-  io.println("Running yarn script: " <> fname)
+pub fn start_loop(vm: runner.State) {
   io.println("Hello! Welcome to this wonderful adventure. Node=" <> vm.node)
-  loop(vm |> runner.debug_config(debug_trace))
+  loop(vm)
+}
+
+pub fn start_test(vm: runner.State, test_input: List(Int)) {
+  runner.test_run(vm, test_input, io.println)
 }

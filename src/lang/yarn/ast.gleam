@@ -123,9 +123,12 @@ pub fn error_in(ar: YarnArtifact, ix: Int, default: a, error: a) {
   }
 }
 
-// TODO handle
-// import gleam/float
-// const precise_int_limit: Float = 10_000.0
+fn when(b: Bool, c: String) -> String {
+  case b {
+    True -> c
+    False -> ""
+  }
+}
 
 pub fn pretty_val(val: YarnVal) -> String {
   case val {
@@ -164,14 +167,16 @@ pub fn pretty_cmd(c: YarnCommand, depth: Int) -> String {
     If(cond, then_, else_) ->
       "if "
       <> pretty_expr(cond)
-      <> ">>\n"
+      <> ">>"
+      <> when(then_ |> list.is_empty |> bool.negate, "\n")
       <> then_ |> pretty_lbody(depth + 1)
       <> option.unwrap(
         else_
           |> option.map(fn(else_body) {
             "\n"
             <> prefix
-            <> "<<else>>\n"
+            <> "<<else>>"
+            <> when(else_body |> list.is_empty |> bool.negate, "\n")
             <> else_body |> pretty_lbody(depth + 1)
           }),
         "",
@@ -180,14 +185,16 @@ pub fn pretty_cmd(c: YarnCommand, depth: Int) -> String {
     Once(cond, body, else_) ->
       "once"
       <> option.unwrap(cond |> option.map(fn(e) { " " <> pretty_expr(e) }), "")
-      <> ">>\n"
+      <> ">>"
+      <> when(body |> list.is_empty |> bool.negate, "\n")
       <> body |> pretty_lbody(depth + 1)
       <> option.unwrap(
         else_
           |> option.map(fn(else_body) {
             "\n"
             <> prefix
-            <> "<<else>>\n"
+            <> "<<else>>"
+            <> when(else_body |> list.is_empty |> bool.negate, "\n")
             <> else_body |> pretty_lbody(depth + 1)
           }),
         "",
@@ -196,7 +203,8 @@ pub fn pretty_cmd(c: YarnCommand, depth: Int) -> String {
     DeclEnum(name, values) ->
       "<<enum>>"
       <> name
-      <> " {\n"
+      <> " {"
+      <> when(values |> list.is_empty |> bool.negate, "\n")
       <> values
       |> list.map(fn(v) { prefix2 <> "<<case " <> v <> ">>" })
       |> string.join("\n")
@@ -250,39 +258,36 @@ pub fn pretty_body(b: YarnBody, depth: Int) -> String {
       option.unwrap(name_ |> option.map(fn(n) { n <> ": " }), "")
       <> pretty_line(content)
       <> pretty_tags(tags)
-      <> "  // line "
-      <> int.to_string(depth)
     Choice(items) ->
       items
       |> list.index_map(fn(c, ix) {
-        "-> "
+        when(ix > 0, string.repeat("  ", depth))
+        <> "-> "
         <> pretty_line(c.content)
         <> option.unwrap(
           c.condition |> option.map(fn(c) { "<<if " <> pretty_expr(c) <> ">>" }),
           "",
         )
         <> pretty_tags(c.tags)
-        <> "  // choice #"
-        <> int.to_string(ix)
-        <> ", "
-        <> int.to_string(depth)
-        <> "\n"
+        <> when(c.next |> list.is_empty |> bool.negate, "\n")
         <> c.next |> pretty_lbody(depth + 1)
       })
       |> string.join("\n")
     LineGroup(items) ->
       items
-      |> list.map(fn(g) {
-        "=> "
+      |> list.index_map(fn(g, ix) {
+        when(ix > 0, string.repeat("  ", depth))
+        <> "=> "
         <> pretty_line(g.content)
         <> option.unwrap(
           g.condition |> option.map(fn(c) { "<<if " <> pretty_expr(c) <> ">>" }),
           "",
         )
         <> pretty_tags(g.tags)
-        <> "  // line-group "
-        <> int.to_string(depth)
-        <> "\n"
+        <> case g.next |> list.is_empty {
+          True -> ""
+          False -> "\n"
+        }
         <> g.next |> pretty_lbody(depth + 1)
       })
       |> string.join("\n")

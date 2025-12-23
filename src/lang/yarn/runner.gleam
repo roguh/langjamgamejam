@@ -364,8 +364,8 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
   |> list.flatten
 }
 
-pub fn compile_or_null(source, filename) {
-  State(..compile(source) |> result.unwrap(null_vm()), filename: filename)
+pub fn compile_or_null(source) {
+  compile(source) |> result.unwrap(null_vm())
 }
 
 pub fn compile_error(source, _) -> String {
@@ -435,18 +435,46 @@ fn push(vm: State, op: Operand) {
   [op, ..vm.stack]
 }
 
-pub fn test_run(vm: State, inputs: List(Int)) -> State {
+pub fn test_run(
+  vm: State,
+  inputs: List(Int),
+  printer: fn(String) -> Nil,
+) -> State {
+  let print_say = fn(vm_) {
+    vm_ |> saying |> result.map(printer) |> result.unwrap(Nil)
+    vm_
+  }
   // Calls next until Stopped or forever
   // Useful for automated test cases
-  case vm.state {
-    Stopped -> vm
-    WaitingOnContinue -> vm |> next |> test_run(inputs)
-    WaitingOnChoice ->
+  case vm |> needs_choice, vm |> needs_continue {
+    [], False -> vm |> print_say
+    [_, ..], _ -> {
+      printer(
+        vm
+        |> needs_choice
+        |> list.index_map(fn(c, index) {
+          index |> int.add(1) |> int.to_string <> ": " <> c
+        })
+        |> string.join("\n"),
+      )
       case inputs {
-        [choice, ..rest] -> vm |> choose(choice) |> next |> test_run(rest)
-        [] -> vm
+        [choice, ..rest] -> {
+          printer(">>>> Choosing " <> choice |> int.to_string)
+          vm
+          |> choose(
+            // User inputs are 1-indexed, VM is 0-indexed
+            choice |> int.subtract(1),
+          )
+          |> print_say
+          |> test_run(rest, printer)
+        }
+        [] -> {
+          printer(">>>> No inputs left, but choice was requested")
+          vm
+        }
       }
-    Running -> vm |> next |> test_run(inputs)
+    }
+    _, True -> vm |> continue |> print_say |> test_run(inputs, printer)
   }
 }
 
@@ -731,4 +759,8 @@ pub fn node_names(vm: State) -> List(String) {
 
 pub fn debug_config(vm: State, debug_trace: Bool) -> State {
   State(..vm, trace_print: debug_trace)
+}
+
+pub fn set_filename(vm: State, filename: String) -> State {
+  State(..vm, filename: filename)
 }
