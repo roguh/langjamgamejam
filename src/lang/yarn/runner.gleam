@@ -1,7 +1,3 @@
-//////////////////// AHHHHHHHHHHHHH  TODO COMPILE RIGHT
-//////////////////// AHHHHHHHHHHHHH  TODO COMPILE RIGHT
-/////////// PUBLIC API
-
 import gleam/dict.{type Dict}
 import gleam/float
 import gleam/int
@@ -16,7 +12,6 @@ import lang/yarn/parse
 
 pub type State {
   State(
-    // TODO enforce state within type system?
     state: ExecutionState,
     node: String,
     ip: Int,
@@ -69,6 +64,7 @@ pub type Instruction {
   // Pop two and do the thing
   Binary(String)
   Unary(String)
+  Native(String)
   Push(Operand)
   Pop
   Dup
@@ -155,6 +151,7 @@ pub fn print_instrs(instrs: Array(Instruction), jump_table: Dict(String, Int)) {
       IWaitChoice -> "IWaitChoice"
       Binary(op) -> "Binary(" <> op <> ")"
       Unary(op) -> "Unary(" <> op <> ")"
+      Native(op) -> "Native(" <> op <> ")"
     }
   })
   |> string.join("\n")
@@ -200,21 +197,90 @@ fn compile_line(l: List(ast.LineElement)) {
       list.append(
         case first {
           ast.Text(text) -> [Push(VString(text))]
-          ast.Inline(expr) -> list.append(compile_expr(expr), [Unary("str")])
-          ast.Markup(m) -> todo as "compile_line markup"
+          ast.Inline(expr) -> list.append(compile_expr(expr), [Native("str")])
+          ast.Markup(_) -> todo as "compile_line markup"
         },
         rest
           |> list.map(fn(e) {
             case e {
               ast.Text(text) -> [Push(VString(text)), Binary("+")]
               ast.Inline(expr) ->
-                list.append(compile_expr(expr), [Unary("str"), Binary("+")])
-              ast.Markup(m) -> todo as "compile_line markup"
+                list.append(compile_expr(expr), [Native("str"), Binary("+")])
+              ast.Markup(_) -> todo as "compile_line markup"
             }
           })
           |> list.flatten,
       )
   }
+}
+
+fn compile_choice(
+  cs,
+  label: String,
+  picking_code: List(Instruction),
+  restate_chosen: Bool,
+) {
+  let endlabel = label <> "end_" <> rand_id()
+  let choicelabels =
+    cs
+    |> list.index_map(fn(_v, index) {
+      #(index, label <> "_" <> index |> int.to_string <> "_" <> rand_id())
+    })
+    |> dict.from_list
+  let lbl = fn(i) {
+    choicelabels
+    |> dict.get(i)
+    |> result.unwrap("")
+  }
+
+  //4 appends :)
+  list.append(
+    list.append(
+      list.append(
+        list.append(
+          cs
+            |> list.map(fn(c) { c.content |> compile_line })
+            |> list.flatten,
+          picking_code,
+        ),
+        cs
+          |> list.index_map(fn(_, index) {
+            // Now Jump!
+            // TODO faster jump selection...
+            [
+              Dup,
+              Push(VFloat(index |> int.to_float)),
+              Binary("!="),
+              JumpLabelIfFalse(index |> lbl),
+            ]
+          })
+          |> list.flatten,
+      ),
+      cs
+        |> list.index_map(fn(c, index) {
+          // Run contents then jump to end of this choice to skip over all other choices
+          // TODO fallthrough for last choice
+          list.append(
+            [
+              Label(index |> lbl),
+              ..list.append(
+                case restate_chosen {
+                  True ->
+                    list.append(c.content |> compile_line, [ISay(option.None)])
+                  False -> []
+                },
+                c.next |> compile_,
+              )
+            ],
+            [
+              JumpLabel(endlabel),
+            ],
+          )
+        })
+        |> list.flatten,
+    ),
+    [Label(endlabel)],
+  )
 }
 
 fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
@@ -223,64 +289,19 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
     case b_ {
       ast.Line(content, name, _tags) ->
         list.append(compile_line(content), [ISay(name), IWaitContinue])
-      ast.Choice(cs) -> {
-        let endlabel = "endchoice_" <> rand_id()
-        let choicelabels =
-          cs
-          |> list.index_map(fn(_v, index) {
-            #(index, "choice_" <> index |> int.to_string <> "_" <> rand_id())
-          })
-          |> dict.from_list
-        let lbl = fn(i) {
-          choicelabels
-          |> dict.get(i)
-          |> result.unwrap("")
-        }
-
-        list.append(
-          list.append(
-            list.append(
-              list.append(
-                //4 appends????? let's go!!!
-                cs
-                  |> list.map(fn(c) { c.content |> compile_line })
-                  |> list.flatten,
-                [
-                  // /
-                  // Present the user N strings from the stack
-                  ISayn(cs |> list.length),
-                  // Wait for the user to choose an option and leave choice on stack
-                  // one int->str  "0" "1" "2" "3" on top
-                  IWaitChoice,
-                ],
-              ),
-              cs
-                |> list.index_map(fn(_, index) {
-                  // Now Jump!
-                  // TODO faster jump selection...
-                  [
-                    Dup,
-                    Push(VString(index |> int.to_string)),
-                    Binary("!="),
-                    JumpLabelIfFalse(index |> lbl),
-                  ]
-                })
-                |> list.flatten,
-            ),
-            cs
-              |> list.index_map(fn(c, index) {
-                // Run contents then jump to end of this choice to skip over all other choices
-                // TODO fallthrough for last choice
-                list.append([Label(index |> lbl), ..c.next |> compile_], [
-                  JumpLabel(endlabel),
-                ])
-              })
-              |> list.flatten,
-          ),
-          [Label(endlabel)],
+      ast.Choice(cs) ->
+        compile_choice(
+          cs,
+          "choice",
+          [
+            // Present the user N strings from the stack
+            ISayn(cs |> list.length),
+            // Wait for the user to choose an option and leave choice on stack as a VFloat
+            // 0.0 1.0 2.0 ...
+            IWaitChoice,
+          ],
+          False,
         )
-      }
-
       ast.Cmd(ast.Jump(node_name)) -> [JumpNode(node_name)]
       ast.Cmd(ast.Stop) -> [Halt]
       ast.Cmd(ast.Decl(name, expr)) ->
@@ -321,23 +342,20 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
           ],
         )
       }
-      ast.LineGroup(items) -> {
-        let compiled_items =
-          items
-          |> list.map(fn(g) {
-            list.append(compile_line(g.content), [
-              ISay(option.None),
-              IWaitContinue,
-              ..compile_(g.next)
-            ])
-          })
-        // TODO jump to random then jump to end unconditionally
-        // how to get random? how to get index of last item?
-        compiled_items |> list.flatten
-      }
+      ast.LineGroup(items) ->
+        compile_choice(
+          items,
+          "linegroup",
+          [
+            // Leave a choice from 0 to N-1 on the stack as a string
+            Push(VFloat(items |> list.length |> int.subtract(1) |> int.to_float)),
+            Native("dice"),
+          ],
+          True,
+        )
       ast.Cmd(ast.DeclEnum(_, _)) -> todo as "decl-enum not impl"
       ast.Cmd(ast.Arbitrary(_, _)) -> todo as "arbitrary not impl"
-      ast.Cmd(ast.Detour(node_name)) -> todo as "detour not impl"
+      ast.Cmd(ast.Detour(_)) -> todo as "detour not impl"
       ast.Cmd(ast.Return) -> todo as "return not implemented"
     }
   })
@@ -348,11 +366,10 @@ pub fn compile_or_null(source, filename) {
   State(..compile(source) |> result.unwrap(null_vm()), filename: filename)
 }
 
-pub fn compile_error(source, filename) -> String {
+pub fn compile_error(source, _) -> String {
   compile(source)
-  |> result.map(fn(_) { "" })
   |> result.map_error(fn(e) { e })
-  |> result.unwrap_both
+  |> result.unwrap_error("")
 }
 
 pub fn compile(source: String) -> Result(State, String) {
@@ -398,14 +415,6 @@ fn top(vm: State) -> Operand {
   vm.stack |> list.first |> result.unwrap(VNil)
 }
 
-fn pop2(vm: State) {
-  case vm.stack {
-    [a, b, ..] -> #(a, b)
-    [a, ..] -> #(a, VNil)
-    [] -> #(VNil, VNil)
-  }
-}
-
 fn pop(vm: State) {
   case vm.stack {
     [a, ..] -> a
@@ -439,7 +448,12 @@ pub fn test_run(vm: State, inputs: List(Int)) -> State {
   }
 }
 
-fn run_one_instr(vm, i: Instruction) {
+fn run_one_instr(vm: State, i: Instruction) {
+  // "i: "
+  // <> print_instrs(glearray.from_list([i]), vm.jump_table)
+  // <> "\nstack: "
+  // <> vm.stack |> list.map(print_op) |> string.join("; ")
+
   case i {
     Push(op) -> State(..vm, ip: vm.ip + 1, stack: vm |> push(op))
     ISay(name) ->
@@ -473,6 +487,8 @@ fn run_one_instr(vm, i: Instruction) {
         _ -> vm
       }
     }
+    Native(op) ->
+      State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop |> native(op)))
     Unary(op) ->
       State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop |> un(op)))
     // skip over labels, no-ops
@@ -541,7 +557,7 @@ fn if_false(v: Operand, a, b) {
 fn bin(a_, b_, op: String) -> Operand {
   case op {
     "==" -> VBool(a_ == b_)
-    "!=" -> VBool(a_ == b_)
+    "!=" -> VBool(a_ != b_)
     ">" ->
       case a_, b_ {
         VFloat(a), VFloat(b) -> VBool(b >. a)
@@ -580,6 +596,24 @@ fn un(a_: Operand, op: String) -> Operand {
   }
 }
 
+fn as_int(o: Operand) {
+  case o {
+    VFloat(f) -> f |> float.round
+    VString(s) -> s |> int.parse |> result.unwrap(0)
+    VBool(True) -> 1
+    VBool(False) -> 0
+    VNil -> 0
+  }
+}
+
+fn native(a_: Operand, op: String) -> Operand {
+  case op {
+    "str" -> VString(a_ |> print_op)
+    "dice" -> VFloat(int.random(a_ |> as_int |> int.add(1)) |> int.to_float)
+    _ -> todo as "unknown function"
+  }
+}
+
 pub fn get_var(vm: State, name: String) -> Operand {
   vm.vars |> dict.get(name) |> result.unwrap(VNil)
 }
@@ -607,7 +641,7 @@ pub fn choose(vm: State, index: Int) -> State {
             ..vm,
             state: WaitingOnContinue,
             say: [],
-            stack: vm |> push(VString(index |> int.to_string)),
+            stack: vm |> push(VFloat(index |> int.to_float)),
           )
           |> continue
       }
@@ -647,7 +681,7 @@ pub fn current_node(vm: State) -> String {
 
 pub fn needs_choice(vm: State) -> List(String) {
   case vm.state {
-    WaitingOnChoice -> vm.say
+    WaitingOnChoice -> vm.say |> list.reverse
     _ -> []
   }
 }
@@ -671,5 +705,5 @@ pub fn needs_continue(vm: State) -> Bool {
 }
 
 pub fn saying(vm: State) -> String {
-  vm.say |> string.join("\n")
+  vm.say |> list.reverse |> string.join("\n")
 }

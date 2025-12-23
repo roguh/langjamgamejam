@@ -35,7 +35,7 @@ pub fn code(content: String) {
 
 pub fn view(yarn_artifact: YarnArtifact) -> Element(a) {
   case yarn_artifact {
-    Ok(content) ->
+    Ok(_) ->
       html.div([], [
         // code(ast.pretty(content)),
       ])

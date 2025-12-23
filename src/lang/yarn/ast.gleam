@@ -78,15 +78,6 @@ pub type LineElement {
   Markup(YarnMarkup)
 }
 
-pub type YarnLineGroupItem {
-  LineGroupItem(
-    content: List(LineElement),
-    next: List(YarnBody),
-    tags: List(String),
-    condition: Option(YarnExpr),
-  )
-}
-
 pub type YarnChoiceItem {
   ChoiceItem(
     content: List(LineElement),
@@ -100,7 +91,7 @@ pub type YarnBody {
   // See the pretty-printer and parser for syntax
   Line(content: List(LineElement), name: Option(String), tags: List(String))
   Choice(List(YarnChoiceItem))
-  LineGroup(List(YarnLineGroupItem))
+  LineGroup(List(YarnChoiceItem))
   Cmd(YarnCommand)
 }
 
@@ -275,9 +266,10 @@ pub fn pretty_body(b: YarnBody, depth: Int) -> String {
         <> int.to_string(ix)
         <> ", "
         <> int.to_string(depth)
+        <> "\n"
         <> c.next |> pretty_lbody(depth + 1)
       })
-      |> string.join("\n  ")
+      |> string.join("\n")
     LineGroup(items) ->
       items
       |> list.map(fn(g) {
@@ -290,9 +282,10 @@ pub fn pretty_body(b: YarnBody, depth: Int) -> String {
         <> pretty_tags(g.tags)
         <> "  // line-group "
         <> int.to_string(depth)
+        <> "\n"
         <> g.next |> pretty_lbody(depth + 1)
       })
-      |> string.join("\n  ")
+      |> string.join("\n")
     Cmd(cmd) -> pretty_cmd(cmd, depth)
   }
 }

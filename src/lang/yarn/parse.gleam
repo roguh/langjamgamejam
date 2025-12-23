@@ -83,7 +83,7 @@ fn line_group_item() {
   )
   let tags = []
   let cond = option.None
-  pure(ast.LineGroupItem([ast.Text(text)], option.unwrap(body, []), tags, cond))
+  pure(ast.ChoiceItem([ast.Text(text)], option.unwrap(body, []), tags, cond))
 }
 
 fn line_group() {
@@ -153,7 +153,7 @@ fn comparison() {
   use rest <- do(
     ops.many(
       try_({
-        use op <- do(ops.choice([token("<"), token(">")]) |> ws())
+        use op <- do(ops.choice([token("<"), token(">"), match("==")]) |> ws())
         use right <- do(sum() |> ws())
         pure(#(op, right))
       }),

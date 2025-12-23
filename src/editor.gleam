@@ -5,7 +5,6 @@ import lustre/element/html
 import lustre/element/keyed
 import lustre/event
 
-import gleam/io
 import gleam/list
 import gleam/option
 import gleam/result
@@ -199,14 +198,17 @@ fn init(_args) -> Model {
   )
 }
 
-pub fn main() {
+pub fn main() -> Bool {
   let app = lustre.simple(init, update, view)
   case lustre.start(app, "#app", Nil) {
-    Ok(_) -> Nil
-    e -> {
-      echo e
-      io.println("Try running with --file-name or --eval instead")
-      Nil
+    Ok(_) -> echo False
+    Error(lustre.NotABrowser) -> {
+      // Try running as CLI
+      True
+    }
+    Error(err) -> {
+      echo err
+      False
     }
   }
 }
