@@ -42,6 +42,7 @@ pub type YarnExpr {
   UnaryOp(String, YarnExpr)
   // Variables always prefixed with $
   Var(String)
+  Call(YarnExpr, List(YarnExpr))
 }
 
 pub type YarnCommand {
@@ -148,6 +149,11 @@ pub fn pretty_expr(expr: YarnExpr) -> String {
       pretty_expr(left) <> " " <> op <> " " <> pretty_expr(right)
     UnaryOp(op, expr) -> op <> pretty_expr(expr)
     Var(name) -> name
+    Call(name, args) ->
+      name |> pretty_expr
+      <> "("
+      <> args |> list.map(pretty_expr) |> string.join(",")
+      <> ")"
   }
 }
 

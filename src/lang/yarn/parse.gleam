@@ -27,7 +27,6 @@ fn hs(p) {
 }
 
 fn ws(p) {
-  use <- atto.label("spaces")
   use x <- do(p |> text_util.ws())
   // TODO ops.many() doesn't work well with empty parsers
   use <- drop(comment() |> text_util.ws())
@@ -43,9 +42,25 @@ fn yarn_key() {
 fn line() {
   use <- atto.label("line")
   use name <- do(atto.try(yarn_key()))
-  use text <- do(match("[^<{}=\n]+") |> ws())
+  use contents <- do(
+    ops.some(
+      ops.choice([
+        {
+          use <- atto.label("inline expression")
+          use <- drop(match("{") |> ws())
+          use e <- do(expr() |> ws())
+          use <- drop(token("}") |> ws())
+          pure(ast.Inline(e))
+        },
+        {
+          use <- atto.label("plain text line")
+          match("[^<{}=\n]+") |> atto.map(ast.Text)
+        },
+      ]),
+    ),
+  )
   let tags = []
-  pure(ast.Line([ast.Text(text)], name, tags))
+  pure(ast.Line(contents, name, tags))
 }
 
 fn choice() {
@@ -101,6 +116,10 @@ fn var() {
   match("\\$[a-zA-Z][a-zA-Z0-9_]*") |> ws()
 }
 
+fn funcname() {
+  match("[a-zA-Z][a-zA-Z0-9_]*") |> ws()
+}
+
 fn val() {
   ops.choice([
     {
@@ -127,38 +146,125 @@ fn val() {
   |> ws()
 }
 
-fn expr0() {
+fn primary() {
+  use <- atto.label("primary expression")
   ops.choice([
-    val() |> atto.map(ast.Val),
-    var() |> atto.map(ast.Var),
+    try_(val()) |> atto.map(ast.Val),
+    try_(var()) |> atto.map(ast.Var),
+    {
+      use name <- do(try_(funcname() |> ws()))
+      use <- drop(try_(token("(")) |> ws())
+      // TODO more than 1 arg
+      use arg <- do(try_(expr()) |> ws())
+      use <- drop(token(")"))
+      pure(ast.Call(ast.Val(ast.YString(name)), [arg]))
+    },
+    {
+      use <- drop(token("(") |> ws())
+      use body <- do(expr() |> ws())
+      use <- drop(token(")"))
+      pure(body)
+    },
   ])
 }
 
-fn sum() {
-  use left <- do(try_(expr0() |> ws()))
-  use rest <- do(
-    ops.many(
-      try_({
-        use op <- do(ops.choice([token("+"), token("-")]) |> ws())
-        use right <- do(expr0() |> ws())
-        pure(#(op, right))
-      }),
-    ),
+fn unary() {
+  use <- atto.label("unary operator")
+  use unary_ops <- do(ops.many(ops.choice([token("!"), token("~")]) |> ws()))
+  use right <- do(primary())
+  pure(unary_ops |> list.fold(right, fn(acc, op) { ast.UnaryOp(op, acc) }))
+}
+
+fn exp() {
+  binop([try_(token("^"))], unary)
+}
+
+fn prod() {
+  binop(
+    [
+      try_(token("*")),
+      try_(token("/")),
+      try_(match("//")),
+      token("%"),
+    ],
+    exp,
   )
-  pure(rest |> list.fold(left, fn(acc, kv) { ast.BinOp(kv.0, acc, kv.1) }))
+}
+
+fn sum() {
+  binop(
+    [
+      token("+"),
+      token("-"),
+    ],
+    prod,
+  )
+}
+
+fn bitshift() {
+  binop(
+    [
+      try_(token("<<")),
+      try_(token(">>")),
+    ],
+    sum,
+  )
+}
+
+fn comparison_lt_gt() {
+  binop(
+    [
+      try_(token("<")),
+      try_(token(">")),
+      try_(token("<=")),
+      try_(token(">=")),
+    ],
+    bitshift,
+  )
+}
+
+fn comparison_eq() {
+  binop(
+    [
+      try_(token("==")),
+      try_(token("!=")),
+    ],
+    comparison_lt_gt,
+  )
+}
+
+fn bitwise_and() {
+  binop([try_(token("&"))], comparison_eq)
+}
+
+fn bitwise_or() {
+  binop([try_(token("|"))], bitwise_and)
+}
+
+fn comparison_and() {
+  binop([try_(match("&&"))], bitwise_or)
 }
 
 fn comparison() {
-  use left <- do(try_(sum() |> ws()))
+  binop([try_(match("||"))], comparison_and)
+}
+
+fn binop(operators, next_level) {
+  use <- atto.label("binary operator")
+  use left <- do(try_(next_level() |> ws()))
   use rest <- do(
     ops.many(
       try_({
-        use op <- do(ops.choice([token("<"), token(">"), match("==")]) |> ws())
-        use right <- do(sum() |> ws())
+        use op <- do(
+          ops.choice(operators)
+          |> ws(),
+        )
+        use right <- do(next_level() |> ws())
         pure(#(op, right))
       }),
     ),
   )
+  // TODO right-associative
   pure(rest |> list.fold(left, fn(acc, kv) { ast.BinOp(kv.0, acc, kv.1) }))
 }
 

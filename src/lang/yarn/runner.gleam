@@ -71,6 +71,8 @@ pub type Instruction {
   Binary(String)
   Unary(String)
   Native(String)
+  // Call top of stack as a function with all function args below it
+  CallTop
   Push(Operand)
   Pop
   // Stop execution
@@ -153,6 +155,7 @@ pub fn print_instrs(instrs: Array(Instruction), jump_table: Dict(String, Int)) {
       Binary(op) -> "Binary(" <> op <> ")"
       Unary(op) -> "Unary(" <> op <> ")"
       Native(op) -> "Native(" <> op <> ")"
+      CallTop -> "CallTop"
     }
   })
   |> string.join("\n")
@@ -187,6 +190,9 @@ fn compile_expr(e: ast.YarnExpr) {
       ])
     ast.UnaryOp(op, expr) -> list.append(compile_expr(expr), [Unary(op)])
     ast.Var(var_name) -> [Get(var_name)]
+    ast.Call(name, [arg]) ->
+      list.append(compile_expr(arg), list.append(compile_expr(name), [CallTop]))
+    ast.Call(_, _) -> todo as "only one argument functions for now"
     ast.List(_) -> todo as "compile_expr list"
   }
 }
@@ -435,6 +441,10 @@ fn push(vm: State, op: Operand) {
   [op, ..vm.stack]
 }
 
+fn pusha(array, op: Operand) {
+  [op, ..array]
+}
+
 pub fn test_run(
   vm: State,
   inputs: List(Int),
@@ -518,9 +528,17 @@ fn run_one_instr(vm: State, i: Instruction) {
       }
     }
     Native(op) ->
-      State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop |> native(op)))
+      State(
+        ..vm,
+        ip: vm.ip + 1,
+        stack: vm |> rest |> pusha(vm |> pop |> native(op)),
+      )
     Unary(op) ->
-      State(..vm, ip: vm.ip + 1, stack: vm |> push(vm |> pop |> un(op)))
+      State(
+        ..vm,
+        ip: vm.ip + 1,
+        stack: vm |> rest |> pusha(vm |> pop |> un(op)),
+      )
     // skip over labels, no-ops
     Label(_) -> State(..vm, ip: vm.ip + 1)
     JumpLabel(s) ->
@@ -540,6 +558,15 @@ fn run_one_instr(vm: State, i: Instruction) {
         stack: vm |> rest,
       )
     Jump(offset) -> State(..vm, ip: vm.ip + offset)
+    CallTop ->
+      State(..vm, ip: vm.ip + 1, stack: case vm.stack {
+        [VString(name), arg, ..rest] -> [native(arg, name), ..rest]
+        [_, e, ..] -> {
+          echo "Warning, top of stack is not a string " <> e |> print_op
+          vm.stack
+        }
+        _ -> vm.stack
+      })
     JumpToTop ->
       State(..vm, ip: vm.ip + int_or(vm |> pop, 1), stack: vm |> rest)
     JumpIfFalse(offset) ->
@@ -580,6 +607,7 @@ fn if_false(v: Operand, a, b) {
 
 fn bin(a_, b_, op: String) -> Operand {
   case op {
+    "&&" -> VBool(as_bool(a_) && as_bool(b_))
     "==" -> VBool(a_ == b_)
     "!=" -> VBool(a_ != b_)
     ">" ->
@@ -599,7 +627,7 @@ fn bin(a_, b_, op: String) -> Operand {
     "+" ->
       case a_, b_ {
         VFloat(a), VFloat(b) -> VFloat(b +. a)
-        VString(a), VString(b) -> VString(a <> b)
+        VString(a), VString(b) -> VString(b <> a)
         // TODO handle runtime errors from interpreter!
         _, _ -> todo as "+ runtime error"
       }
@@ -609,15 +637,19 @@ fn bin(a_, b_, op: String) -> Operand {
 
 fn un(a_: Operand, op: String) -> Operand {
   case op {
-    "!" ->
-      case a_ {
-        VBool(a) -> VBool(!a)
-        VNil -> VBool(True)
-        VString("") -> VBool(True)
-        VFloat(0.0) -> VBool(True)
-        _ -> VBool(False)
-      }
+    "!" -> VBool(!as_bool(a_))
+    "~" -> VFloat(as_int(a_) |> int.bitwise_not |> int.to_float)
     _ -> todo as "unknown unary op"
+  }
+}
+
+fn as_bool(o: Operand) -> Bool {
+  case o {
+    VBool(a) -> a
+    VNil -> False
+    VString("") -> False
+    VFloat(0.0) -> False
+    _ -> True
   }
 }
 
@@ -711,11 +743,9 @@ pub fn needs_choice(vm: State) -> List(String) {
   }
 }
 
-pub fn jump_to_node(vm: State, node_: String) {
-  let node = node_
-
+pub fn jump_to_node(vm: State, node: String) {
   case vm.nodes |> dict.has_key(node) {
-    True -> echo "Warning! node does not exist"
+    False -> echo "Warning! node does not exist (" <> node <> ")"
     _ -> ""
   }
   State(..vm, node: node, say: [], stack: [], ip: 0, state: WaitingOnContinue)
@@ -743,6 +773,10 @@ pub fn saying(vm: State) -> Result(String, Nil) {
     Stopped -> Error(Nil)
     _ -> Ok(vm |> saying_list |> string.join("\n"))
   }
+}
+
+pub fn saying_or_empty(vm: State) -> String {
+  vm |> saying |> result.unwrap("")
 }
 
 pub fn is_start(vm: State) -> Bool {

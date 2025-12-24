@@ -1,6 +1,7 @@
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/option
 import gleam/result
 import gleam/string
 
@@ -32,6 +33,7 @@ type YarnRun {
     mode: YarnMode,
     test_input: List(Int),
     debug_trace: Bool,
+    node: option.Option(String),
   )
 }
 
@@ -46,6 +48,14 @@ fn debug_trace() -> Opt(Bool) {
   |> opt.help("Enable trace printing for each instruction being executed.")
   |> opt.map(fn(_) { True })
   |> opt.default(False)
+}
+
+fn node() -> Opt(option.Option(String)) {
+  opt.new("node")
+  |> opt.short("j")
+  |> opt.help("Jump to a specific node on startup.")
+  |> opt.map(option.Some)
+  |> opt.default(option.None)
 }
 
 fn validate_test_input(s: String) -> Result(List(Int), String) {
@@ -113,6 +123,7 @@ fn mode() -> Opt(YarnMode) {
 
 fn command() -> clip.Command(Result(YarnCommand, String)) {
   clip.command({
+    use start_node <- clip.parameter()
     use test_input <- clip.parameter
     use debug_trace <- clip.parameter
     use fname <- clip.parameter
@@ -139,6 +150,7 @@ fn command() -> clip.Command(Result(YarnCommand, String)) {
             mode,
             test_input_,
             debug_trace,
+            start_node,
           ))
         }),
       result.or(
@@ -151,12 +163,14 @@ fn command() -> clip.Command(Result(YarnCommand, String)) {
               mode,
               test_input_,
               debug_trace,
+              start_node,
             ))
           }),
         Ok(Nothing),
       ),
     )
   })
+  |> clip.opt(node())
   |> clip.opt(test_input())
   |> clip.opt(debug_trace())
   |> clip.opt(file())
@@ -175,12 +189,18 @@ fn run_yarn(y: YarnRun) {
       runner.compile(y.source)
       |> result.map(runner.debug_config(_, y.debug_trace))
       |> result.map(runner.set_filename(_, y.fname))
+      |> result.map(fn(vm) {
+        y.node |> option.map(runner.jump_to_node(vm, _)) |> option.unwrap(vm)
+      })
       |> result.map(runner_cli.start_test(_, y.test_input))
       |> result.replace("The end.")
     Interactive ->
       runner.compile(y.source)
       |> result.map(runner.debug_config(_, y.debug_trace))
       |> result.map(runner.set_filename(_, y.fname))
+      |> result.map(fn(vm) {
+        y.node |> option.map(runner.jump_to_node(vm, _)) |> option.unwrap(vm)
+      })
       |> result.map(runner_cli.start_loop)
       |> result.replace("The end.")
     CompileJS -> Error("JS compilation not implemented yet")
