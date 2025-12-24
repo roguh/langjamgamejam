@@ -248,8 +248,6 @@ fn compile_choice(
         // Jump Table
         // The top of the stack is guaranteed to be between 0 and N-1
         // Jump to 1+choice, then jump to choice's label
-        Push(VFloat(1.0)),
-        Binary("+"),
         JumpToTop,
         ..cs
         |> list.index_map(fn(_, index) { JumpLabel(index |> lbl) })
@@ -306,6 +304,8 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
             [
               // Step 3/3: The user will leave an integer between 0 and N-1 on top of the stack
               IWaitChoice,
+              Push(VFloat(1.0)),
+              Binary("+"),
             ],
           ),
           False,
@@ -316,7 +316,7 @@ fn compile_(b: List(ast.YarnBody)) -> List(Instruction) {
           "linegroup",
           [
             // Leave a choice from 0 to N-1 on the stack as a string
-            Push(VFloat(items |> list.length |> int.subtract(1) |> int.to_float)),
+            Push(VFloat(items |> list.length |> int.to_float)),
             Native("dice"),
           ],
           True,
@@ -666,7 +666,7 @@ fn as_int(o: Operand) {
 fn native(a_: Operand, op: String) -> Operand {
   case op {
     "str" -> VString(a_ |> print_op)
-    "dice" -> VFloat(int.random(a_ |> as_int |> int.add(1)) |> int.to_float)
+    "dice" -> VFloat(int.random(a_ |> as_int) |> int.add(1) |> int.to_float)
     _ -> todo as "unknown function"
   }
 }

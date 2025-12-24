@@ -9,7 +9,7 @@ import {
   continue$,
   set_var_bool,
   get_var,
-  saying,
+  saying_or_empty,
   jump_to_node,
   current_node,
   choose,
@@ -236,11 +236,11 @@ export class Game extends Scene {
     // -704,709
     this.items.push({
       obj: this.ship,
-      text: saying(continue$(jump_to_node(this.dialogue_vm, "Ship"))),
+      text: saying_or_empty(continue$(jump_to_node(this.dialogue_vm, "Ship"))),
     });
     this.items.push({
       obj: this.add.rectangle(-596, 709, 10, 10, 0xff0000).setAlpha(0.01),
-      text: saying(
+      text: saying_or_empty(
         continue$(jump_to_node(this.dialogue_vm, "Ship_Bookshelves")),
       ),
     });
@@ -755,7 +755,7 @@ export class Game extends Scene {
       this.dialogue_vm = continue$(this.dialogue_vm);
     }
     const currentDialogue =
-      presentingOptions.length === 0 ? saying(this.dialogue_vm) : "";
+      presentingOptions.length === 0 ? saying_or_empty(this.dialogue_vm) : "";
 
     const justChose = Object.entries(choices)
       .filter(([ix, val]) => val)
@@ -797,10 +797,14 @@ export class Game extends Scene {
     if (obj === this.chests[0]) {
       // set VM variable
       this.foundSupplies = true;
-      this.dialogue_vm = set_var_bool(this.dialogue_vm, "$foundSupplies", true);
+      this.dialogue_vm = set_var_bool(
+        this.dialogue_vm,
+        "$foundSupplies1",
+        true,
+      );
       console.log(
         "Found supplies?",
-        get_var(this.dialogue_vm, "$foundSupplies")[0],
+        get_var(this.dialogue_vm, "$foundSupplies1")[0],
       );
     }
     if (obj === this.chests[1]) {
@@ -829,8 +833,16 @@ export class Game extends Scene {
     if (get_var(this.dialogue_vm, "$ending_vera_dies")[0] === true) {
       this.gameOver("The tree has consumed you.");
     }
-    if (get_var(this.dialogue_vm, "$ending_vera_enlightened")[0] === true) {
-      this.gameOver("enlightenment found.");
+    if (get_var(this.dialogue_vm, "$ending_vera_flies_away")[0] === true) {
+      const enlightened =
+        get_var(this.dialogue_vm, "$ending_vera_enlightened")[0] === true;
+      if (enlightened) {
+        this.gameOver(
+          "Vera flies away to continue her journey, her heart is at ease.",
+        );
+      } else {
+        this.gameOver("Vera flies away to continue her journey.");
+      }
     }
     const onGround =
       this.player.body?.touching.down || this.player?.tileCollide;

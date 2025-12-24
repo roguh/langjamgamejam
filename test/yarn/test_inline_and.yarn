@@ -1,0 +1,6 @@
+title: Adventure
+---
+<<set $a to True && False>>
+the value is  {$a}
+===
+

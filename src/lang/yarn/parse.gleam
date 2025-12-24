@@ -39,34 +39,46 @@ fn yarn_key() {
   pure(key)
 }
 
+fn line_contents() {
+  ops.some(
+    ops.choice([
+      {
+        use <- atto.label("plain text line")
+        match("[^<{}=\n]+") |> atto.map(ast.Text)
+      },
+      {
+        echo "inline"
+        use <- atto.label("inline expression")
+        use <- drop(match("{") |> hs())
+        use e <- do(expr() |> hs())
+        use <- drop(token("}") |> hs())
+        pure(ast.Inline(e))
+      },
+    ]),
+  )
+}
+
 fn line() {
   use <- atto.label("line")
   use name <- do(atto.try(yarn_key()))
-  use contents <- do(
-    ops.some(
-      ops.choice([
-        {
-          use <- atto.label("inline expression")
-          use <- drop(match("{") |> ws())
-          use e <- do(expr() |> ws())
-          use <- drop(token("}") |> ws())
-          pure(ast.Inline(e))
-        },
-        {
-          use <- atto.label("plain text line")
-          match("[^<{}=\n]+") |> atto.map(ast.Text)
-        },
-      ]),
-    ),
-  )
+  use contents <- do(line_contents())
   let tags = []
   pure(ast.Line(contents, name, tags))
 }
 
 fn choice() {
-  use <- atto.label("choices")
+  use <- atto.label("choice")
   use <- drop(match("->") |> hs())
-  use text <- do(match("[^=<{}\n]+") |> ws())
+  use text <- do(line_contents())
+  use cond <- do(
+    atto.try({
+      use <- drop(match("<<if") |> hs())
+      use e <- do(expr())
+      use <- drop(match(">>") |> hs())
+      pure(e)
+    })
+    |> ws(),
+  )
   use body <- do(
     atto.try({
       use <- drop(token("{") |> ws())
@@ -76,8 +88,7 @@ fn choice() {
     }),
   )
   let tags = []
-  let cond = option.None
-  pure(ast.ChoiceItem([ast.Text(text)], option.unwrap(body, []), tags, cond))
+  pure(ast.ChoiceItem(text, option.unwrap(body, []), tags, cond))
 }
 
 fn choices() {
@@ -88,6 +99,14 @@ fn line_group_item() {
   use <- atto.label("line group item")
   use <- drop(try_(match("=>") |> hs()))
   use text <- do(match("[^=<{}\n]+") |> ws())
+  use cond <- do(
+    atto.try({
+      use <- drop(match("<<if") |> hs())
+      use e <- do(expr())
+      use <- drop(match(">>") |> ws())
+      pure(e)
+    }),
+  )
   use body <- do(
     atto.try({
       use <- drop(token("{") |> ws())
@@ -97,7 +116,6 @@ fn line_group_item() {
     }),
   )
   let tags = []
-  let cond = option.None
   pure(ast.ChoiceItem([ast.Text(text)], option.unwrap(body, []), tags, cond))
 }
 
@@ -152,16 +170,16 @@ fn primary() {
     try_(val()) |> atto.map(ast.Val),
     try_(var()) |> atto.map(ast.Var),
     {
-      use name <- do(try_(funcname() |> ws()))
-      use <- drop(try_(token("(")) |> ws())
+      use name <- do(try_(funcname() |> hs()))
+      use <- drop(try_(token("(")) |> hs())
       // TODO more than 1 arg
-      use arg <- do(try_(expr()) |> ws())
+      use arg <- do(try_(expr()) |> hs())
       use <- drop(token(")"))
       pure(ast.Call(ast.Val(ast.YString(name)), [arg]))
     },
     {
-      use <- drop(token("(") |> ws())
-      use body <- do(expr() |> ws())
+      use <- drop(token("(") |> hs())
+      use body <- do(expr() |> hs())
       use <- drop(token(")"))
       pure(body)
     },
@@ -176,10 +194,12 @@ fn unary() {
 }
 
 fn exp() {
+  use <- atto.label("exponentiation binary ops")
   binop([try_(token("^"))], unary)
 }
 
 fn prod() {
+  use <- atto.label("prod binary ops")
   binop(
     [
       try_(token("*")),
@@ -192,6 +212,7 @@ fn prod() {
 }
 
 fn sum() {
+  use <- atto.label("sum binary ops")
   binop(
     [
       token("+"),
@@ -202,51 +223,58 @@ fn sum() {
 }
 
 fn bitshift() {
+  use <- atto.label("shift binary ops")
   binop(
     [
-      try_(token("<<")),
-      try_(token(">>")),
+      try_(match(">>")),
+      try_(match("<<")),
     ],
     sum,
   )
 }
 
 fn comparison_lt_gt() {
+  use <- atto.label("lt gt binary ops")
   binop(
     [
-      try_(token("<")),
-      try_(token(">")),
-      try_(token("<=")),
-      try_(token(">=")),
+      try_(match("<")),
+      try_(match(">")),
+      match("<="),
+      match(">="),
     ],
     bitshift,
   )
 }
 
 fn comparison_eq() {
+  use <- atto.label("eq binary ops")
   binop(
     [
-      try_(token("==")),
-      try_(token("!=")),
+      match("=="),
+      match("!="),
     ],
     comparison_lt_gt,
   )
 }
 
 fn bitwise_and() {
-  binop([try_(token("&"))], comparison_eq)
+  use <- atto.label("& binary op")
+  binop([token("&")], comparison_eq)
 }
 
 fn bitwise_or() {
-  binop([try_(token("|"))], bitwise_and)
+  use <- atto.label("| binary op")
+  binop([token("|")], bitwise_and)
 }
 
 fn comparison_and() {
-  binop([try_(match("&&"))], bitwise_or)
+  use <- atto.label("and binary op")
+  binop([match("&&")], bitwise_or)
 }
 
 fn comparison() {
-  binop([try_(match("||"))], comparison_and)
+  use <- atto.label("or binary ops")
+  binop([match("||")], comparison_and)
 }
 
 fn binop(operators, next_level) {
@@ -271,6 +299,7 @@ fn binop(operators, next_level) {
 fn expr() {
   // Thanks for the refresh, Varun Ramesh
   // https://blog.varunramesh.net/posts/algebraic-expressions-using-parser-combinators/#left-associative-binary-operators
+  use <- atto.label("expression")
   comparison()
 }
 

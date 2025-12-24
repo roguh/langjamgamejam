@@ -124,6 +124,8 @@ Record 65: Vera Orion. Your blood work has come back well. It is clear that the 
 
 title: Ship
 ---
+-> Fly away. <<if $foundSupplies1 && $foundSupplies2>>
+  {<<set $ending_vera_flies_away to true>>}
 -> View "Record 65"
  {Record 65: Vera Orion
   Your blood work has come back well.

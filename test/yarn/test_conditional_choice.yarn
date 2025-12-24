@@ -1,0 +1,8 @@
+title: Adventure
+---
+<<set $a to "dice"(2.0)>>
+-> a  {$a}
+-> b
+-> c <<if $a == 1.0>>
+===
+
