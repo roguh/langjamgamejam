@@ -1,8 +1,15 @@
 title: Friendly_Squirrel
 ---
 Hello traveler!
+<<once>>
+<<if $tree_met == false>>
 You'll want to peer into this cave.
 Speak to the Tree...
+<<endif>>
+<<endonce>>
+<<if $ending_vera_enlightened == true>>
+You seem lighter somehow.
+<<endif>>
 ===
 
 title: Secret_Squirrel
@@ -21,6 +28,7 @@ Then continue downwards to find the treasure.
 
 title: Tree
 ---
+<<set $tree_met to true>>
 <<once>>
 *Vera places her hand against the tree
 A voice in Vera's Mind: So it is true.
@@ -124,12 +132,29 @@ Record 65: Vera Orion. Your blood work has come back well. It is clear that the 
 
 title: Ship
 ---
--> Fly away. <<if $foundSupplies1 && $foundSupplies2>>
+<<if $foundSupplies1 && $foundSupplies2>>
+-> Fly away.
   {<<set $ending_vera_flies_away to true>>}
--> View "Record 65"
- {Record 65: Vera Orion
-  Your blood work has come back well.
-  It is clear that the treatment has been having the intended effect.
+-> View records
+  {<<jump ShipRecords>>}
+<<else>>
+  <<jump ShipRecords>>
+<<endif>>
+===
+
+title: ShipRecords
+---
+-> View "Record 1"
+ {Holding power over a thousand planets stands The Sunburst Empire.
+ A highly advanced civilization that wields super weapons able to destroy suns.
+ }
+-> View "Record 2"
+ {I would like to extend my sincere condolences to you and your family.
+  Losing a parent is never an easy thing to go through and I am deeply sorry you have to experience such pain and heartache.
+  I know it has been over a decade since we last saw each other but I had to reach out to you in this tragic situation.
+  When you last left my clinic we had reached a real breakthrough and I would be more than willing to reignite our sessions if needed.
+  I am available anytime.
+  - Dr. Alma Senri
   }
 -> View "Record 14"
  {Jonathan I refuse to accept this.
@@ -139,18 +164,11 @@ title: Ship
   Your father didn't put his life on the line and die to be disrespected like this.
   You need to stop and seriously consider the repercussions of your actions.
   }
--> View "Record 2"
- {I would like to extend my sincere condolences to you and your family.
-  Losing a parent is never an easy thing to go through and I am deeply sorry you have to experience such pain and heartache.
-  I know it has been over a decade since we last saw each other but I had to reach out to you in this tragic situation.
-  When you last left my clinic we had reached a real breakthrough and I would be more than willing to reignite our sessions if needed.
-  I am available anytime.
-  - Dr. Alma Senri
+-> View "Record 65"
+ {Record 65: Vera Orion
+  Your blood work has come back well.
+  It is clear that the treatment has been having the intended effect.
   }
--> View "Record 1"
- {Holding power over a thousand planets stands The Sunburst Empire.
- A highly advanced civilization that wields super weapons able to destroy suns.
- }
 <<jump Ship>>
 ===
 

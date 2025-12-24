@@ -13,6 +13,7 @@ import {
   jump_to_node,
   current_node,
   choose,
+  is_end,
   // goto_node,
 } from "../../gleamjunk/glisten48/lang/yarn/runner";
 
@@ -462,7 +463,7 @@ export class Game extends Scene {
         this.add
           .text(
             96 * PHI,
-            H - dialogueH - 64 - 32 * i - 12,
+            H - dialogueH - 64 - 48 * i - 12,
             `Dialogue option ${i + 1}`,
             {
               fontSize: "24px",
@@ -474,7 +475,7 @@ export class Game extends Scene {
           .setOrigin(0)
           .setDepth(96),
         this.add
-          .text(32 * PHI, H - dialogueH - 64 - 32 * i - 12, `> ${i + 1}`, {
+          .text(32 * PHI, H - dialogueH - 64 - 48 * i - 12, `> ${i + 1}`, {
             fontSize: "24px",
             color: "#ff1964",
             stroke: "#ff1964",
@@ -489,7 +490,7 @@ export class Game extends Scene {
         this.add
           .rectangle(
             32 * PHI - 16,
-            H - dialogueH - 64 - 32 * i - 16,
+            H - dialogueH - 64 - 48 * i - 16,
             32 * PHI + 32,
             32 * 0.98,
             0x000000,
@@ -499,13 +500,18 @@ export class Game extends Scene {
         this.add
           .rectangle(
             64 * PHI + 32,
-            H - dialogueH - 64 - 32 * i - 16,
+            H - dialogueH - 64 - 48 * i - 16,
             W,
             32 * 0.98,
             0xff1964,
           )
           .setOrigin(0)
-          .setDepth(94),
+          .setDepth(94)
+          .setInteractive()
+          .on("pointerdown", () => {
+            this.dialogue_vm = choose(this.dialogue_vm, i);
+            this.playerTimes.dialogueStart = this.time.now;
+          }),
       ]);
     this.dialogueElements = [
       this.dialogueBox,
@@ -724,7 +730,7 @@ export class Game extends Scene {
   ) {
     let next;
 
-    if (current_node(this.dialogue_vm) != yarnNodeName) {
+    if (!current_node(this.dialogue_vm).startsWith(yarnNodeName)) {
       console.log("going to", yarnNodeName);
       this.dialogue_vm = jump_to_node(this.dialogue_vm, yarnNodeName);
     }
@@ -751,8 +757,8 @@ export class Game extends Scene {
     const name = (yarnNodeName || "").replace(/_/g, " ");
 
     if (continueJustReleased) {
-      console.log("SPACE");
       this.dialogue_vm = continue$(this.dialogue_vm);
+      this.playerTimes.dialogueStart = this.time.now;
     }
     const currentDialogue =
       presentingOptions.length === 0 ? saying_or_empty(this.dialogue_vm) : "";
@@ -762,10 +768,11 @@ export class Game extends Scene {
       .map(([ix, _]) => ix);
     if (justChose.length > 0) {
       this.dialogue_vm = choose(this.dialogue_vm, Number(justChose[0]) - 1);
+      this.playerTimes.dialogueStart = this.time.now;
     }
 
     // If running, animate at obj location
-    const ix = (1 + (this.time.now - this.playerTimes.dialogueStart) / 60) | 0;
+    const ix = (1 + (this.time.now - this.playerTimes.dialogueStart) / 20) | 0;
     const sub = currentDialogue.slice(0, ix);
     this.dialogueText.setText(wrap(sub, MAX_DIALOGUE));
     let t = "";
@@ -806,6 +813,7 @@ export class Game extends Scene {
         "Found supplies?",
         get_var(this.dialogue_vm, "$foundSupplies1")[0],
       );
+      obj.destroy();
     }
     if (obj === this.chests[1]) {
       // set VM variable
@@ -819,6 +827,7 @@ export class Game extends Scene {
         "Found more supplies?",
         get_var(this.dialogue_vm, "$foundSupplies2")[0],
       );
+      obj.destroy();
     }
   }
   closeInventory() {
@@ -837,11 +846,9 @@ export class Game extends Scene {
       const enlightened =
         get_var(this.dialogue_vm, "$ending_vera_enlightened")[0] === true;
       if (enlightened) {
-        this.gameOver(
-          "Vera flies away to continue her journey, her heart is at ease.",
-        );
+        this.gameOver("Vera flies away, heart at ease.");
       } else {
-        this.gameOver("Vera flies away to continue her journey.");
+        this.gameOver("Vera flies away.");
       }
     }
     const onGround =
@@ -907,8 +914,8 @@ export class Game extends Scene {
     } else {
       this.dashBar.fillColor = 0x000000;
       this.canInteractText.setColor("#ff1964");
-      //this.actionmusic.pause();
-      //this.intromusic.isPaused && this.intromusic.play();
+      this.actionmusic.pause();
+      this.intromusic.isPaused && this.intromusic.play();
     }
 
     if (

@@ -571,7 +571,7 @@ fn run_one_instr(vm: State, i: Instruction) {
       State(..vm, ip: vm.ip + int_or(vm |> pop, 1), stack: vm |> rest)
     JumpIfFalse(offset) ->
       State(..vm, ip: vm.ip + if_false(vm |> top, offset, 1), stack: vm |> rest)
-    JumpNode(n) -> vm |> jump_to_node(n)
+    JumpNode(n) -> vm |> jump_to_node(n) |> continue
     Halt -> State(..vm, state: Stopped)
     Return -> todo as "runner return unimplemented"
   }

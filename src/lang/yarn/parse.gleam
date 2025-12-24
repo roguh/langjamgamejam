@@ -43,19 +43,21 @@ fn line_contents() {
   ops.some(
     ops.choice([
       {
+        echo "plain"
         use <- atto.label("plain text line")
         match("[^<{}=\n]+") |> atto.map(ast.Text)
       },
       {
         echo "inline"
         use <- atto.label("inline expression")
-        use <- drop(match("{") |> hs())
+        use <- drop(token("{") |> hs())
         use e <- do(expr() |> hs())
         use <- drop(token("}") |> hs())
         pure(ast.Inline(e))
       },
     ]),
   )
+  |> ws()
 }
 
 fn line() {
