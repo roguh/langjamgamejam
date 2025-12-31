@@ -1,0 +1,71 @@
+title: Setup
+---
+<<set $base to 10>>
+===
+
+title: fromint
+---
+<<if $fromint_in == 0>>
+  <<set $fromint_out to [0]>>
+  <<return>>
+<<endif>>
+<<set $fromint_out to []>>
+<<detour fromint_loop>>
+<<return>>
+===
+
+title: fromint_loop
+---
+<<if $fromint_in != 0>>
+  // TODO arbitrary commands for the array stdlib
+  // https://docs.yarnspinner.dev/2.3/using-yarnspinner-with-unity/creating-commands-functions
+  <<array.append $fromint_out ($fromint_in % $base)>>
+  <<set $fromint_in to ($fromint_in // $base)>>
+  <<detour fromint_loop>>
+<<endif>>
+<<return>>
+===
+
+title: zeros
+---
+<<if $zeros_in <= 0>>
+  // $zeros_out will contain an array with N zeros
+  <<return>>
+<<endif>>
+<<array.append $zeros_out 0>>
+<<set $zeros_in to $zeros_in - 1>>
+<<detour zeros>>
+===
+
+title: add
+---
+<<set $_add_carry to 0>>
+// TODO array size syntax sugar #X becomes array.size($X)
+<<if #add_a >= #add_b>>
+  <<set $zeros_in #add_a>>
+<<else>>
+  <<set $zeros_in #add_b>>
+<<endif>>
+<<detour zeros>>
+
+// TODO setting to an array must create a copy of the array, not a new ref!
+<<set $add_out to $zeros_out>>
+
+<<for $i from 1 to #c>>
+  <<set $_add_total to $_add_carry>>
+  <<if i < #add_a>>
+    <<set $_add_total $total + $add_a[i]>>
+  <<endif>>
+  <<if i < #add_b>>
+    <<set $_add_total $total + $add_b[i]>>
+  <<endif>>
+  <<set $_add_carry $total // $base>>
+  // TODO how to set array? alternative: define a command <<array.set>>
+  <<set $add_out[$i] to $total % $base>>
+<<endfor>>
+
+<<if $_add_carry != 0>>
+  <<array.append $add_out $add_carry>>
+<<endif>>
+<<return>>
+===
