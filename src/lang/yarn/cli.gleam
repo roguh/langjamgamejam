@@ -13,6 +13,8 @@ import lang/yarn/ast.{pretty, pretty_error}
 import lang/yarn/parse
 import lang/yarn/runner
 import lang/yarn/runner_cli
+
+@target(erlang)
 import simplifile
 
 const default_mode = Parse
@@ -40,6 +42,16 @@ type YarnRun {
 type YarnCommand {
   Nothing
   YarnRunCommand(YarnRun)
+}
+
+@target(erlang)
+fn read_file(fname: String) -> Result(String, String) {
+  simplifile.read(fname) |> result.map_error(simplifile.describe_error)
+}
+
+@target(javascript)
+fn read_file(fname: String) -> Result(String, String) {
+  Error("not in js you won't")
 }
 
 fn debug_trace() -> Opt(Bool) {
@@ -139,9 +151,7 @@ fn command() -> clip.Command(Result(YarnCommand, String)) {
     result.or(
       fname
         |> result.replace_error("No filename given")
-        |> result.map(fn(f) {
-          simplifile.read(f) |> result.map_error(simplifile.describe_error)
-        })
+        |> result.map(read_file)
         |> result.flatten
         |> result.map(fn(source) {
           YarnRunCommand(YarnRun(

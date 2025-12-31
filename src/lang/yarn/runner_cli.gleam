@@ -6,7 +6,7 @@ import gleam/string
 import in
 import lang/yarn/runner
 
-@external(javascript, "global", "prompt")
+@external(javascript, "./ffi.mjs", "prompt")
 fn read_line() -> String {
   in.read_line() |> result.unwrap("")
 }

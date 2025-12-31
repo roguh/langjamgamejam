@@ -1,5 +1,8 @@
-name = "glisten48"
+name = "shiny_yarn"
 version = "1.0.0"
+
+# This prevents lustre from redownloading bun every time you run the project
+tools.lustre.bin.bun="system"
 
 # Fill out these fields if you intend to generate HTML documentation or publish
 # your project to the Hex package manager.

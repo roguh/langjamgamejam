@@ -203,9 +203,12 @@ fn init(_args) -> Model {
 pub fn main() -> Bool {
   let app = lustre.simple(init, update, view)
   case lustre.start(app, "#app", Nil) {
-    Ok(_) -> echo False
+    Ok(_) -> {
+      echo "Running Lustre"
+      False
+    }
     Error(lustre.NotABrowser) -> {
-      // Try running as CLI
+      // Return True to indicate the user should use the CLI instead
       True
     }
     Error(err) -> {
